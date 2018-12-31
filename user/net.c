@@ -7,19 +7,21 @@
 
 #include "board.h"
 #include "uart_trans.h"
+#include "net.h"
 
 struct espconn server_conn;
 const char server_ip[4] = SERVER_IP;
 bool is_wifi_connect=false;
 uint32_t wifi_check_timer; 
 uint32_t net_check_timer; 
+static net_conn_cb* net_connect_cb;
 
 void ICACHE_FLASH_ATTR net_send(uint8_t* pdata, uint8_t len)
 {
 	os_printf("tcp send:");
 	for(uint16_t i=0; i<len; i++) {
 		os_printf("%02x ", pdata[i]);
-		uart_trans_send(pdata[i]);
+		// uart_trans_send(pdata[i]);
 	}
 	os_printf("\n");	
 	espconn_sent(&server_conn, pdata, len);	
@@ -30,9 +32,11 @@ void ICACHE_FLASH_ATTR tcp_recv_cb(void *arg, char *pdata, unsigned short len)
 	os_printf("tcp recv:");
 	for(uint16_t i=0; i<len; i++) {
 		os_printf("%02x ", pdata[i]);
-		uart_trans_send(pdata[i]);
+//		uart_trans_send(pdata[i]);
 	}
 	os_printf("\n");
+
+	uart_trans_send(pdata, len);
 
 	//espconn_sent((struct espconn *) arg, "0", strlen("0"));
 }
@@ -53,6 +57,10 @@ void ICACHE_FLASH_ATTR server_connect_cb(void *arg)
 	espconn_regist_recvcb(conn, tcp_recv_cb); 
 	espconn_regist_sentcb(conn, tcp_send_cb);  
 	espconn_regist_disconcb(conn, tcp_disconnect_cb);
+
+	if(net_connect_cb != NULL) {
+		net_connect_cb(NULL);
+	}
 
 	// uint8_t mac[6];
 	// wifi_get_macaddr(STATION_IF, mac);
@@ -143,7 +151,7 @@ void ICACHE_FLASH_ATTR net_update(void)
 	}
 }
 
-void ICACHE_FLASH_ATTR net_init(void)
+void ICACHE_FLASH_ATTR net_init(net_conn_cb* cb)
 {
-
+	net_connect_cb = cb;
 }

@@ -349,9 +349,19 @@ void ICACHE_FLASH_ATTR uart1_init(UartBautRate baud)
 /*************************************************************/
 
 
-void ICACHE_FLASH_ATTR uart_trans_send(uint8_t ch)
+void ICACHE_FLASH_ATTR uart_trans_send_ch(uint8_t ch)
 {
 	uart_tx_one_char(UART0, ch);
+}
+
+void ICACHE_FLASH_ATTR uart_trans_send(uint8_t* data, uint8_t len)
+{
+	os_printf("uart send:");
+	for(uint16_t i=0; i<len; i++) {
+		os_printf("%02x ", data[i]);
+		uart_tx_one_char(UART0, data[i]);
+	}
+	os_printf("\n");
 }
 
 void ICACHE_FLASH_ATTR uart_trans_update(void)

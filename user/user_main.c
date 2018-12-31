@@ -39,6 +39,50 @@ bool is_in_smartconfig = false;
 bool last_is_key_long_press = false;
 os_timer_t main_timer;
 
+bool is_first_connect=true;
+
+void ICACHE_FLASH_ATTR send_mac(void)
+{
+	uint8_t mac[6];
+	wifi_get_macaddr(STATION_IF, mac);
+	os_printf("%d macaddr:%x %x %x %x %x %x\n"
+									,mac[0]
+									,mac[1]
+									,mac[2]
+									,mac[3]
+									,mac[4]
+									,mac[5]
+									);
+
+	uint8_t buf[]={0x46, 0xB9, 0x6A, 0x00, 0x0C, 0x00, 0xFF, 0xFF, 0xFF, 0xFF, 0xF1, 0x68, 0xC6, 0x3A, 0xA8, 0x7D, 0x2C, 0x08, 0x1C, 0x16};
+	for(uint8_t i=0; i<6; i++)
+	{
+		buf[11+i] = mac[i];
+	}
+	uint16_t sum=0;
+	for(uint8_t i=0; i<sizeof(buf)-2-3; i++)
+	{
+		sum += buf[2+i];
+	}
+	buf[sizeof(buf)-3] = (uint8_t)(sum>>8);
+	buf[sizeof(buf)-2] = (uint8_t)(sum&0xFF);
+	// os_printf("send:");
+	// for(uint8_t i=0; i<sizeof(buf); i++)
+	// {
+	// 	os_printf("%02x ", buf[i]);
+	// }
+	// os_printf("\n");
+	uart_trans_send(buf, sizeof(buf));	
+}
+
+void ICACHE_FLASH_ATTR net_connect_callback(void* param)
+{
+	if(is_first_connect) {
+		send_mac();
+		is_first_connect = false;
+	}
+}
+
 void ICACHE_FLASH_ATTR smartconfig_callback(void* param)
 {
 	is_in_smartconfig = false;	
@@ -90,6 +134,7 @@ void ICACHE_FLASH_ATTR user_init(void)
     os_printf("SDK version:%s\n", system_get_sdk_version());
 
 	key_init();
+	net_init(net_connect_callback);
 
 	os_timer_setfn(&main_timer, main_func, NULL);
 	os_timer_arm(&main_timer, MAIN_LOOP_MS, 1);	
