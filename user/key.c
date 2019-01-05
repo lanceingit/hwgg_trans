@@ -60,6 +60,7 @@ void ICACHE_FLASH_ATTR key_update(void)
 
 void ICACHE_FLASH_ATTR key_init(void)
 {
+	PIN_FUNC_SELECT(PERIPHS_IO_MUX_MTCK_U, 3);
     GPIO_DIS_OUTPUT(KEY_GPIO);
 }
 
