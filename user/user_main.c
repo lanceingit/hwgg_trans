@@ -102,6 +102,7 @@ void ICACHE_FLASH_ATTR key_func(void)
 					is_in_smartconfig = false;	
 				}
 			} else {
+				is_first_connect=true;
 				if(smartconfig_begin(smartconfig_callback) == true) {
 					is_in_smartconfig = true;
 				}
