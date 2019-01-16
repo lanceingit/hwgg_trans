@@ -38,6 +38,7 @@
 bool is_in_smartconfig = false;
 bool last_is_key_long_press = false;
 os_timer_t main_timer;
+uint32_t smartconfig_start_time;
 
 bool is_first_connect=true;
 
@@ -100,11 +101,13 @@ void ICACHE_FLASH_ATTR key_func(void)
 			if(is_in_smartconfig) {
 				if(smartconfig_end() == true) {
 					is_in_smartconfig = false;	
+					wifi_station_connect();
 				}
 			} else {
 				is_first_connect=true;
 				if(smartconfig_begin(smartconfig_callback) == true) {
 					is_in_smartconfig = true;
+					smartconfig_start_time = system_get_time();
 				}
 			}
 		}	
@@ -115,6 +118,15 @@ void ICACHE_FLASH_ATTR key_func(void)
 void ICACHE_FLASH_ATTR net_func(void)
 {
 	net_update();
+	if(is_in_smartconfig) {
+		if(system_get_time() - smartconfig_start_time > (1000*SMARTCONFIG_TIMEOUT_MS)) {
+			os_printf("smartconfig timeout\n");
+			if(smartconfig_end() == true) {
+				is_in_smartconfig = false;
+				wifi_station_connect();
+			}
+		}
+	}
 }
 
 void uart_func(void)
