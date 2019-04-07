@@ -123,9 +123,6 @@ void ICACHE_FLASH_ATTR net_connect(void)
 
 void ICACHE_FLASH_ATTR net_update(void)
 {
-	struct espconn conn;
-	remot_info *remote_info = NULL;
-
 	if(system_get_time() - wifi_check_timer > (1000*WIFI_CHECK_MS)) {
 		if(wifi_station_get_connect_status() == STATION_GOT_IP) {
 			if(!is_wifi_connect) {
@@ -139,12 +136,7 @@ void ICACHE_FLASH_ATTR net_update(void)
 	}
 
 	if(system_get_time() - net_check_timer > (NET_CHECK_MS*1000)) {
-		if(espconn_get_connection_info(&conn, &remote_info, 0) == 0) {
-			os_printf("connect status:%d\n", conn.state);
-			if(conn.state == ESPCONN_NONE && is_wifi_connect) {
-				net_connect();
-			}
-		} else {
+		if(server_conn.state == ESPCONN_NONE && is_wifi_connect) {
 			net_connect();
 		}
 		net_check_timer = system_get_time();
