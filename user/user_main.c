@@ -32,6 +32,7 @@
 #include "smartconfig_api.h"
 #include "uart_trans.h"
 #include "net.h"
+#include "protocol.h"
 
 
 
@@ -147,6 +148,7 @@ void ICACHE_FLASH_ATTR user_init(void)
     os_printf("SDK version:%s\n", system_get_sdk_version());
 
 	key_init();
+	protocol_init();
 	net_init(net_connect_callback);
 
 	os_timer_setfn(&main_timer, main_func, NULL);

@@ -6,6 +6,7 @@
 #include "board.h"
 #include "driver/uart.h"
 #include "net.h"
+#include "protocol.h"
 
 uint8 uart_buf[128]={0};
 extern UartDevice    UartDev;
@@ -375,7 +376,12 @@ void ICACHE_FLASH_ATTR uart_trans_update(void)
 		}
 		os_printf("\n");
 
-		net_send(uart_buf, len);
+        uint8_t msg;
+        if(protocol_msg_parse(uart_buf, len, &msg)) {
+            if(msg != CMD_RECONNECT) {
+                net_send(uart_buf, len);
+            }
+        }
 	}
 }
 
