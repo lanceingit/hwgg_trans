@@ -136,7 +136,7 @@ void ICACHE_FLASH_ATTR net_update(void)
 	}
 
 	if(system_get_time() - net_check_timer > (NET_CHECK_MS*1000)) {
-		if(server_conn.state == ESPCONN_NONE && is_wifi_connect) {
+		if((server_conn.state == ESPCONN_NONE || server_conn.state == ESPCONN_CLOSE) && is_wifi_connect) {
 			net_connect();
 		}
 		net_check_timer = system_get_time();
