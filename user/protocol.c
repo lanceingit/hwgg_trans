@@ -24,7 +24,7 @@ uint8_t datalen;
 uint8_t protocol_buf[256];
 uint8_t recv_buf[256];
 uint8_t recv_buf_len;
-
+uint32_t recv_sn;
 
 uint16_t ICACHE_FLASH_ATTR protocol_get_checksum(uint8_t* data, uint16_t len)
 {
@@ -53,7 +53,7 @@ void ICACHE_FLASH_ATTR protocol_encode(uint8_t ch, uint8_t* data, uint8_t len)
 	protocol_buf[3] = BYTE3_MASK;
 	protocol_buf[4] = 1+4+len;
 	protocol_buf[5] = DEV_TYPE;
-	uint32_t sn = 0xFFFFFFFF;
+	uint32_t sn = recv_sn;
 	protocol_buf[6] = (sn>>24)&0xFF;
 	protocol_buf[7] = (sn>>16)&0xFF;
 	protocol_buf[8] = (sn>>8)&0xFF;
@@ -111,7 +111,7 @@ bool ICACHE_FLASH_ATTR protocol_parse_char(uint8_t ch)
 			break;            
 		case WAIT_DIR:
             checksum += ch;
-			if(ch == RECV_MASK){
+			if(ch == SEND_MASK){
 				parse_step = WAIT_BYTE3;
 			} else {
                 parse_step = WAIT_HEAD1;
@@ -163,8 +163,9 @@ uint8_t ICACHE_FLASH_ATTR protocol_msg_handle(void)
 	uint8_t cmd = recv_data[5];
 	uint8_t* param = &recv_data[6];
 	uint8_t param_len = data_len - 6;
+	recv_sn = (recv_data[1]<<24)|(recv_data[2]<<16)|(recv_data[3]<<8)|(recv_data[4]);
 
-	os_printf("param_len:%d\n", param_len);
+	//os_printf("param_len:%d\n", param_len);
 
 	switch(cmd) {
 	case CMD_RECONNECT:
