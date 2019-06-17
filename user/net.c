@@ -102,11 +102,22 @@ void ICACHE_FLASH_ATTR tcp_reconnect_cb(void *arg, sint8 err)
 	espconn_connect((struct espconn *) arg);
 }
 
+void ICACHE_FLASH_ATTR net_abort(void) 
+{
+	espconn_abort(&server_conn);
+}
+
 void ICACHE_FLASH_ATTR net_connect(void) 
 {
 	struct ip_info local_ip;
 
-	server_conn.proto.tcp = (esp_tcp *) os_zalloc(sizeof(esp_tcp));  
+	if(server_conn.proto.tcp == NULL) {
+		server_conn.proto.tcp = (esp_tcp *) os_zalloc(sizeof(esp_tcp));
+		if(server_conn.proto.tcp == NULL) {
+			os_printf("[WARN]conn alloc fail!\n");
+			return;
+		}  
+	}
 	server_conn.type = ESPCONN_TCP; 
 	memcpy(server_conn.proto.tcp->remote_ip, server_ip, 4);
 	server_conn.proto.tcp->remote_port = SERVER_PORT;  
@@ -136,6 +147,7 @@ void ICACHE_FLASH_ATTR net_update(void)
 	}
 
 	if(system_get_time() - net_check_timer > (NET_CHECK_MS*1000)) {
+		os_printf("server_conn.state:%d\n",server_conn.state);
 		if((server_conn.state == ESPCONN_NONE || server_conn.state == ESPCONN_CLOSE) && is_wifi_connect) {
 			net_connect();
 		}
@@ -145,5 +157,6 @@ void ICACHE_FLASH_ATTR net_update(void)
 
 void ICACHE_FLASH_ATTR net_init(net_conn_cb* cb)
 {
+	server_conn.proto.tcp = NULL;
 	net_connect_cb = cb;
 }

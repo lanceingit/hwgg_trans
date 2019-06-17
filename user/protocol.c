@@ -171,7 +171,7 @@ uint8_t ICACHE_FLASH_ATTR protocol_msg_handle(void)
 	case CMD_RECONNECT:
 		os_printf("recv cmd:CMD_RECONNECT!\n");
 		protocol_send(PROTOCOL_CH_UART, cmd, false, 1);
-		net_connect();
+		net_abort();
 		break;
 	default:break;					
 	}
