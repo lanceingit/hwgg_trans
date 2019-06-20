@@ -1,6 +1,7 @@
 #include "board.h"
 #include "ets_sys.h"
 #include "osapi.h"
+#include "user_interface.h"
 
 #include <stdarg.h>
 
@@ -171,7 +172,12 @@ uint8_t ICACHE_FLASH_ATTR protocol_msg_handle(void)
 	case CMD_RECONNECT:
 		os_printf("recv cmd:CMD_RECONNECT!\n");
 		protocol_send(PROTOCOL_CH_UART, cmd, false, 1);
-		net_abort();
+		//1.重连网络
+		//net_abort();
+		//2.软件复位
+		system_restart();
+		//3.看门狗复位
+		//while(1);
 		break;
 	default:break;					
 	}
