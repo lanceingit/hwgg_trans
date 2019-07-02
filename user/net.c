@@ -198,7 +198,10 @@ void ICACHE_FLASH_ATTR net_update(void)
 
 	if(system_get_time() - net_check_timer > (NET_CHECK_MS*1000)) {
 		//os_printf("server_conn.state:%d\n",server_conn.state);
-		if((server_conn.state == ESPCONN_NONE || server_conn.state == ESPCONN_CLOSE) && is_wifi_connect && is_dns_ip_found) {
+		if((server_conn.state == ESPCONN_NONE || server_conn.state == ESPCONN_CLOSE) 
+		    && is_wifi_connect 
+			&& (use_ip || is_dns_ip_found)) 
+		{
 			net_connect();
 		}
 		net_check_timer = system_get_time();
