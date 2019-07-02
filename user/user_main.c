@@ -47,7 +47,7 @@ void ICACHE_FLASH_ATTR send_mac(void)
 {
 	uint8_t mac[6];
 	wifi_get_macaddr(STATION_IF, mac);
-	os_printf("%d macaddr:%x %x %x %x %x %x\n"
+	os_printf("macaddr:%x %x %x %x %x %x\n"
 									,mac[0]
 									,mac[1]
 									,mac[2]

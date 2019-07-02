@@ -1,6 +1,5 @@
 #include "user_interface.h"
 #include "osapi.h"
-#include "user_interface.h"
 #include "espconn.h"
 #include "ip_addr.h"
 #include "mem.h"
@@ -10,13 +9,53 @@
 #include "net.h"
 
 struct espconn server_conn;
-const char server_ip[4] = SERVER_IP;
+
+char server_ip[4];
+char dns_ip[4];
+uint16_t server_port;
+char server_domain[100];
+bool use_ip;
+bool is_dns_ip_found=false;
+
 bool is_wifi_connect=false;
 uint32_t wifi_check_timer; 
 uint32_t net_check_timer; 
 static net_conn_cb* net_connect_cb;
 
-void ICACHE_FLASH_ATTR net_send(uint8_t* pdata, uint8_t len)
+void net_set_ip(uint8_t* ip) 
+{
+	memcpy(server_ip, ip, 4);
+}
+
+void net_set_port(uint16_t port) 
+{
+	server_port = port;
+}
+
+void net_set_domain(char* domai) 
+{
+	strncpy(server_domain, domai, 100);
+}
+
+void net_set_use_ip(bool use) 
+{
+	use_ip = use;
+}
+
+void ICACHE_FLASH_ATTR user_esp_platform_dns_found(const char *name, ip_addr_t* ipaddr,	void* arg)
+{
+	struct	espconn	*pespconn	=	(struct	espconn	*)arg;
+
+	if(ipaddr != NULL) {
+		os_printf("dns ip:"IPSTR"\n", IP2STR(&ipaddr->addr));
+		memcpy(dns_ip, &ipaddr->addr, 4);
+		is_dns_ip_found = true;
+	} else {
+		os_printf("dns ip err!\n");
+	}
+}
+
+void ICACHE_FLASH_ATTR net_send(uint8_t* pdata, uint16_t len)
 {
 	os_printf("tcp send:");
 	for(uint16_t i=0; i<len; i++) {
@@ -119,8 +158,13 @@ void ICACHE_FLASH_ATTR net_connect(void)
 		}  
 	}
 	server_conn.type = ESPCONN_TCP; 
-	memcpy(server_conn.proto.tcp->remote_ip, server_ip, 4);
-	server_conn.proto.tcp->remote_port = SERVER_PORT;  
+
+	if(use_ip) {
+		memcpy(server_conn.proto.tcp->remote_ip, server_ip, 4);
+	} else {
+		memcpy(server_conn.proto.tcp->remote_ip, dns_ip, 4);
+	}
+	server_conn.proto.tcp->remote_port = server_port;  
 
 	wifi_get_ip_info(STATION_IF, &local_ip);
 	memcpy(server_conn.proto.tcp->local_ip, &local_ip, 4);
@@ -138,6 +182,12 @@ void ICACHE_FLASH_ATTR net_update(void)
 		if(wifi_station_get_connect_status() == STATION_GOT_IP) {
 			if(!is_wifi_connect) {
 				os_printf("wifi connect ok!\n");
+
+				if(!use_ip) {
+					ip_addr_t esp_server_ip;
+					struct espconn	conn;
+					espconn_gethostbyname(&conn, server_domain, &esp_server_ip, user_esp_platform_dns_found);				
+				}
 			}
 			is_wifi_connect = true;
 		} else {
@@ -147,16 +197,42 @@ void ICACHE_FLASH_ATTR net_update(void)
 	}
 
 	if(system_get_time() - net_check_timer > (NET_CHECK_MS*1000)) {
-		os_printf("server_conn.state:%d\n",server_conn.state);
-		if((server_conn.state == ESPCONN_NONE || server_conn.state == ESPCONN_CLOSE) && is_wifi_connect) {
+		//os_printf("server_conn.state:%d\n",server_conn.state);
+		if((server_conn.state == ESPCONN_NONE || server_conn.state == ESPCONN_CLOSE) && is_wifi_connect && is_dns_ip_found) {
 			net_connect();
 		}
 		net_check_timer = system_get_time();
 	}
 }
 
+/*
+  0-3�?len=4   magic:0xABABFFDC
+  4-7�?len=4   ip
+  8-9�?len=2	port
+   10:  len=1   is_use_ip. =1 use ip; =0 use domain 
+11-99�?len=89  domain(string)
+*/
 void ICACHE_FLASH_ATTR net_init(net_conn_cb* cb)
 {
+    uint8_t buf[100];
+    system_param_load(NET_CONFIG_SECTOR, 0, buf, 100); 	
+	if(((uint32_t*)buf)[0] == NET_CONFIG_MAGIC) {
+        memcpy(&server_ip, &buf[4], 4);
+		server_port = buf[8]<<8 | buf[9];
+		use_ip = buf[10];
+		memcpy(server_domain, &buf[11], 89);
+		server_domain[89] = 0;
+
+		if(use_ip) {
+			os_printf("net config ip:"IPSTR"\n", IP2STR(server_ip));
+		} else {
+			os_printf("net config domain:%s\n", server_domain);		
+		}
+		os_printf("net config port:%d\n", server_port);		
+	} else {
+		os_printf("net config corruption!\n");
+	}
+
 	server_conn.proto.tcp = NULL;
 	net_connect_cb = cb;
 }
