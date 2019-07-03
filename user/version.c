@@ -1,6 +1,6 @@
 #include "ets_sys.h"
 
-#define VERSION_MAJOR    15      
+#define VERSION_MAJOR    17      
 #define VERSION_MINOR    0            
 
 
