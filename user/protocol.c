@@ -8,6 +8,7 @@
 #include "protocol.h"
 #include "net.h"
 #include "uart_trans.h"
+#include "version.h"
 
 #define RETRY_CNT 		3
 #define RECV_BUF_ZISE	255
@@ -26,6 +27,15 @@ uint8_t protocol_buf[256];
 uint8_t recv_buf[256];
 uint8_t recv_buf_len;
 uint32_t recv_sn;
+
+bool protocol_is_need_trans(uint8_t msg)
+{
+	if(msg==CMD_RECONNECT || msg==CMD_GET_WIFI_VERSION) {
+		return false;
+	} else {
+		return true;
+	}
+}
 
 uint16_t ICACHE_FLASH_ATTR protocol_get_checksum(uint8_t* data, uint16_t len)
 {
@@ -80,6 +90,10 @@ int8_t ICACHE_FLASH_ATTR protocol_send(uint8_t ch, uint8_t cmd, bool need_ack, .
 		send_buf[1] = va_arg(args, int);
 		datalen += 1;
 		break;
+	case CMD_GET_WIFI_VERSION:
+		send_buf[1] = va_arg(args, int);
+		datalen += 1;
+		break;		
 	default:break;	
 	}
 	va_end(args);
@@ -112,11 +126,12 @@ bool ICACHE_FLASH_ATTR protocol_parse_char(uint8_t ch)
 			break;            
 		case WAIT_DIR:
             checksum += ch;
-			if(ch == SEND_MASK){
-				parse_step = WAIT_BYTE3;
-			} else {
-                parse_step = WAIT_HEAD1;
-            } 
+			// if(ch == SEND_MASK){
+			// 	parse_step = WAIT_BYTE3;
+			// } else {
+            //     parse_step = WAIT_HEAD1;
+            // } 
+			parse_step = WAIT_BYTE3;
 			break;
 		case WAIT_BYTE3:
             checksum += ch;
@@ -179,6 +194,10 @@ uint8_t ICACHE_FLASH_ATTR protocol_msg_handle(void)
 		//3.看门狗复位
 		//while(1);
 		break;
+	case CMD_GET_WIFI_VERSION:
+		os_printf("recv cmd:CMD_GET_WIFI_VERSION!\n");
+		protocol_send(PROTOCOL_CH_UART, cmd, false, version_get_major());
+		break;		
 	default:break;					
 	}
 

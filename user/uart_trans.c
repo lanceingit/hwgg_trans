@@ -378,7 +378,7 @@ void ICACHE_FLASH_ATTR uart_trans_update(void)
 
         uint8_t msg;
         if(protocol_msg_parse(uart_buf, len, &msg)) {
-            if(msg != CMD_RECONNECT) {
+            if(protocol_is_need_trans(msg)) {
                 net_send(uart_buf, len);
             }
         }
@@ -389,5 +389,5 @@ void ICACHE_FLASH_ATTR uart_trans_init(void)
 {
 	uart0_init(UART_TRANS_BAUD);
 	uart1_init(UART_PRINTF_BAUD);
-	UART_SetPrintPort(1);
+	UART_SetPrintPort(0);
 }

@@ -108,6 +108,7 @@ app暂无此操作
 #define CMD_GET_TIME            0x07
 #define CMD_GET_VERSION         0x08
 #define CMD_RECONNECT           0x0B
+#define CMD_GET_WIFI_VERSION    0x0C
 
 
 enum parse_status
@@ -133,4 +134,4 @@ void protocol_init(void);
 void protocol_update(void);
 void protocol_set_recv(uint8_t* data, uint16_t len);
 bool protocol_msg_parse(uint8_t* data, uint16_t len, uint8_t* msg_id);
-
+bool protocol_is_need_trans(uint8_t msg_id);
