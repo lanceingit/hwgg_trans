@@ -389,5 +389,5 @@ void ICACHE_FLASH_ATTR uart_trans_init(void)
 {
 	uart0_init(UART_TRANS_BAUD);
 	uart1_init(UART_PRINTF_BAUD);
-	UART_SetPrintPort(0);
+	UART_SetPrintPort(UART_PRINT_PORT);
 }
