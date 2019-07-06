@@ -163,29 +163,36 @@ void ICACHE_FLASH_ATTR smartconfig_done(sc_status status, void *pdata)
             break;
         case SC_STATUS_LINK:
             os_printf("SC_STATUS_LINK\n");
+            struct station_config *sta_conf = pdata;
             // uint8 ssid[32];
-            // uint8 password[64];            
+            // uint8 password[64];        
+            // uint8 bssid_set;
+            // uint8 bssid[6];    
             for(int i=0; i<32; i++) {
-                os_printf("%c", pdata);
+                os_printf("%02x ", ((char*)pdata)[i]);
             }
             for(int i=0; i<64; i++) {
-                os_printf("%c", ((char*)pdata)[32+i]);
+                os_printf("%02x ", ((char*)pdata)[32+i]);
+            }
+            os_printf("\n");
+            os_printf("bssid_set:%d bssid:", ((struct station_config*)pdata)->bssid_set);
+            for(int i=0; i<6; i++) {
+                os_printf("%02x ", ((struct station_config*)pdata)->bssid[i]);
             }
             os_printf("\n");
 
             if(smartconfig_decode(pdata, ssid, password, domain, ip, port)) {
-                struct station_config sta_conf;
-                memcpy(&sta_conf.ssid, ssid, 32);
-                sta_conf.ssid[31] = 0;
-                memcpy(&sta_conf.password, password, 64);
-                sta_conf.password[63] = 0;
+                memcpy(sta_conf->ssid, ssid, 32);
+                sta_conf->ssid[31] = 0;
+                memcpy(sta_conf->password, password, 64);
+                sta_conf->password[63] = 0;
 
                 /*
-                0-3： len=4   magic:0xABABFFDC
-                4-7： len=4   ip
-                8-9： len=2	port
-                10:  len=1   is_use_ip. =1 use ip; =0 use domain 
-                11-99： len=89  domain(string)
+                0-3:   len=4   magic:0xABABFFDC
+                4-7:   len=4   ip
+                8-9:   len=2   port
+                10:    len=1   is_use_ip. =1 use ip; =0 use domain 
+                11-99: len=89  domain(string)
                 */
                 uint8_t* buf = os_malloc(100);
                 if(buf != NULL) {
@@ -216,11 +223,10 @@ void ICACHE_FLASH_ATTR smartconfig_done(sc_status status, void *pdata)
                     }   
                     os_free(buf);
                 }               
-                
-                wifi_station_set_config(&sta_conf);
-                wifi_station_disconnect();
-                wifi_station_connect();
             }
+            wifi_station_set_config(sta_conf);
+            wifi_station_disconnect();
+            wifi_station_connect();
             break;
         case SC_STATUS_LINK_OVER:
             os_printf("SC_STATUS_LINK_OVER\n");
