@@ -41,7 +41,7 @@ bool last_is_key_long_press = false;
 os_timer_t main_timer;
 uint32_t smartconfig_start_time;
 
-bool is_first_connect=true;
+bool smartconfig_done=false;
 
 void ICACHE_FLASH_ATTR send_mac(void)
 {
@@ -79,9 +79,9 @@ void ICACHE_FLASH_ATTR send_mac(void)
 
 void ICACHE_FLASH_ATTR net_connect_callback(void* param)
 {
-	if(is_first_connect) {
+	if(smartconfig_done) {
 		send_mac();
-		is_first_connect = false;
+		smartconfig_done = false;
 	}
 }
 
@@ -105,7 +105,7 @@ void ICACHE_FLASH_ATTR key_func(void)
 					wifi_station_connect();
 				}
 			} else {
-				is_first_connect=true;
+				smartconfig_done=true;
 				if(smartconfig_begin(smartconfig_callback) == true) {
 					is_in_smartconfig = true;
 					smartconfig_start_time = system_get_time();

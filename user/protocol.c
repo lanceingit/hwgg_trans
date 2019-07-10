@@ -17,7 +17,7 @@ enum parse_status parse_step = WAIT_HEAD1;
 
 uint16_t checksum;
 // uint8_t protocol_dir;
-uint8_t data_len;
+static uint8_t data_len;
 uint8_t recv_data[256];
 uint8_t data_cnt;
 uint8_t resend_try;

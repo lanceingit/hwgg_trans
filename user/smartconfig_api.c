@@ -143,7 +143,7 @@ void ip_atoi(char* ip_str, uint8_t* ip_int)
     }	
 }
 
-void ICACHE_FLASH_ATTR smartconfig_done(sc_status status, void *pdata)
+void ICACHE_FLASH_ATTR smartconfig_done_cb(sc_status status, void *pdata)
 {
     switch(status) {
         case SC_STATUS_WAIT:
@@ -252,7 +252,7 @@ bool ICACHE_FLASH_ATTR smartconfig_begin(config_callback* cb)
     config_cb = cb;
     wifi_set_opmode(STATION_MODE);
     smartconfig_set_type(SC_TYPE_ESPTOUCH);
-    return smartconfig_start(smartconfig_done, 1);
+    return smartconfig_start(smartconfig_done_cb, 1);
 }
 
 bool ICACHE_FLASH_ATTR smartconfig_end(void)
