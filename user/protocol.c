@@ -9,28 +9,33 @@
 #include "net.h"
 #include "uart_trans.h"
 #include "version.h"
+#include "timer.h"
+#include "mcu_boot.h"
 
 #define RETRY_CNT 		3
 #define RECV_BUF_ZISE	255
 
-enum parse_status parse_step = WAIT_HEAD1;
+static enum parse_status parse_step = WAIT_HEAD1;
+enum protocol_status protocol_step = STATUS_IDLE;
 
-uint16_t checksum;
+static uint16_t checksum;
 // uint8_t protocol_dir;
 static uint8_t data_len;
-uint8_t recv_data[256];
-uint8_t data_cnt;
-uint8_t resend_try;
-uint8_t send_buf[256];
-uint8_t datalen;
-uint8_t protocol_buf[256];
-uint8_t recv_buf[256];
-uint8_t recv_buf_len;
-uint32_t recv_sn;
+static uint8_t recv_data[256];
+static uint8_t data_cnt;
+static times_t last_send_time;
+static uint8_t resend_try;
+static uint8_t last_ch;
+static uint8_t send_buf[256];
+static uint8_t datalen;
+static uint8_t protocol_buf[256];
+static uint8_t recv_buf[256];
+static uint8_t recv_buf_len;
+static uint32_t recv_sn;
 
 bool protocol_is_need_trans(uint8_t msg)
 {
-	if(msg==CMD_RECONNECT || msg==CMD_GET_WIFI_VERSION) {
+	if(msg==CMD_RECONNECT || msg==CMD_TRANS_VERSION) {
 		return false;
 	} else {
 		return true;
@@ -80,28 +85,40 @@ void ICACHE_FLASH_ATTR protocol_encode(uint8_t ch, uint8_t* data, uint8_t len)
 
 int8_t ICACHE_FLASH_ATTR protocol_send(uint8_t ch, uint8_t cmd, bool need_ack, ...)
 {
+	if(protocol_step != STATUS_IDLE) return -1;
+
 	va_list args;
 	va_start(args, need_ack); 
 	datalen = 1;
 	send_buf[0] = cmd;
+	last_ch = ch;
 
 	switch(cmd) {
 	case CMD_RECONNECT:
 		send_buf[1] = va_arg(args, int);
 		datalen += 1;
 		break;
-	case CMD_GET_WIFI_VERSION:
+	case CMD_TRANS_VERSION:
 		send_buf[1] = va_arg(args, int);
 		datalen += 1;
+		break;		
+	case CMD_MCU_UPGRADE:
 		break;		
 	default:break;	
 	}
 	va_end(args);
 
 	protocol_encode(ch, send_buf, datalen);
-	// if(need_ack) {
-	// 	last_send_time = timer_now();
-	// }
+	if(need_ack) {
+		protocol_step = STATUS_WAIT_RECV;
+		last_send_time = timer_now();
+	}
+}
+
+void ICACHE_FLASH_ATTR protocol_resend(void)
+{
+	protocol_encode(last_ch, send_buf, datalen);
+	last_send_time = timer_now();	
 }
 
 bool ICACHE_FLASH_ATTR protocol_parse_char(uint8_t ch)
@@ -194,10 +211,14 @@ uint8_t ICACHE_FLASH_ATTR protocol_msg_handle(void)
 		//3.看门狗复位
 		//while(1);
 		break;
-	case CMD_GET_WIFI_VERSION:
-		os_printf("recv cmd:CMD_GET_WIFI_VERSION!\n");
+	case CMD_TRANS_VERSION:
+		os_printf("recv cmd:CMD_TRANS_VERSION!\n");
 		protocol_send(PROTOCOL_CH_UART, cmd, false, version_get_major());
 		break;		
+	case CMD_MCU_UPGRADE:
+		protocol_step = STATUS_WAIT_RECV;
+		set_mcu_in_boot();
+		break;
 	default:break;					
 	}
 
@@ -237,6 +258,17 @@ void ICACHE_FLASH_ATTR protocol_update(void)
 			recv_buf_len = 0;
 		}
 	}
+
+    if(protocol_step == STATUS_WAIT_RECV)
+    {
+		if(timer_check(&last_send_time, 1*1000*1000)) {
+			if(resend_try < RETRY_CNT)
+			{
+				protocol_resend();
+				resend_try++; 
+			}
+		}		
+    }	
 }
 
 void ICACHE_FLASH_ATTR protocol_init(void)

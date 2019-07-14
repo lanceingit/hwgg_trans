@@ -33,7 +33,9 @@
 #include "uart_trans.h"
 #include "net.h"
 #include "protocol.h"
-
+#include "mcu_link.h"
+#include "mcu_boot.h"
+#include <stdlib.h>
 
 
 bool is_in_smartconfig = false;
@@ -99,18 +101,19 @@ void ICACHE_FLASH_ATTR key_func(void)
 	is_key_long_press = key_is_long_press();
 	if(is_key_long_press != last_is_key_long_press) {
 		if(is_key_long_press) {
-			if(is_in_smartconfig) {
-				if(smartconfig_end() == true) {
-					is_in_smartconfig = false;	
-					wifi_station_connect();
-				}
-			} else {
-				smartconfig_done=true;
-				if(smartconfig_begin(smartconfig_callback) == true) {
-					is_in_smartconfig = true;
-					smartconfig_start_time = system_get_time();
-				}
-			}
+			// if(is_in_smartconfig) {
+			// 	if(smartconfig_end() == true) {
+			// 		is_in_smartconfig = false;	
+			// 		wifi_station_connect();
+			// 	}
+			// } else {
+			// 	smartconfig_done=true;
+			// 	if(smartconfig_begin(smartconfig_callback) == true) {
+			// 		is_in_smartconfig = true;
+			// 		smartconfig_start_time = system_get_time();
+			// 	}
+			// }
+			mcu_boot_start();
 		}	
 	}
 	last_is_key_long_press = is_key_long_press;
@@ -135,11 +138,23 @@ void uart_func(void)
 	uart_trans_update();
 }
 
+void mcu_boot_func(void)
+{
+	mcu_boot_run();
+}
+
+void mcu_link_func(void)
+{
+	mcu_link_update();
+}
+
 void ICACHE_FLASH_ATTR main_func(void* arvg)
 {
 	key_func();
 	net_func();
 	uart_func();
+	mcu_link_func();
+	mcu_boot_func();
 }
 
 void ICACHE_FLASH_ATTR user_init(void)
@@ -149,7 +164,9 @@ void ICACHE_FLASH_ATTR user_init(void)
 
 	key_init();
 	protocol_init();
-	net_init(net_connect_callback);
+	net_init(net_connect_callback);	
+	mcu_link_init();
+	mcu_boot_init();
 
 	os_timer_setfn(&main_timer, main_func, NULL);
 	os_timer_arm(&main_timer, MAIN_LOOP_MS, 1);	

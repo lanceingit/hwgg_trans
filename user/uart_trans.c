@@ -7,6 +7,7 @@
 #include "driver/uart.h"
 #include "net.h"
 #include "protocol.h"
+#include "mcu_link.h"
 
 uint8 uart_buf[128]={0};
 extern UartDevice    UartDev;
@@ -382,6 +383,7 @@ void ICACHE_FLASH_ATTR uart_trans_update(void)
                 net_send(uart_buf, len);
             }
         }
+        mcu_link_set_recv(uart_buf, len);
 	}
 }
 
