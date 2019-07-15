@@ -8,6 +8,7 @@
 #include "mcu_link.h"
 #include "mcu_boot.h"
 #include "uart_trans.h"
+#include "mem.h"
 
 #define RETRY_CNT 		3
 #define RECV_BUF_ZISE	255
@@ -17,12 +18,12 @@ static enum mcu_parse_status parse_step = MCULINK_WAIT_HEAD1;
 static uint8_t checksum;
 static uint8_t checksum_buf_index;
 static uint8_t checksum_buf[256];
+static uint8_t link_cmd;
 static uint8_t data_len;
 static uint8_t recv_data[256];
 static uint8_t data_cnt;
 static uint8_t resend_try;
 static uint8_t send_buf[256];
-static uint8_t datalen;
 static uint8_t mcu_link_buf[256];
 static uint8_t recv_buf[256];
 static uint8_t recv_buf_len;
@@ -36,14 +37,20 @@ void mcu_link_send_connect(void)
     mcu_link_encode(MCULINK_CONNECT, NULL, 0);    
 }
 
-void mcu_link_send_update_aprom(uint8_t* data, uint8_t len)
+void mcu_link_send_update_aprom(uint8_t index, uint8_t* data, uint8_t len)
 {
     if(len > 128) {
         os_printf("update aprom len exceed!\n");
         len = 128;
     }
-    os_printf("[mcu link]send update_aprom\n");
-    mcu_link_encode(MCULINK_UPDATE_APROM, data, len);    
+	uint8_t* buf = os_malloc(129);
+	if(buf != NULL) {
+		buf[0] = index;
+		memcpy(&buf[1], data, len);
+		os_printf("[mcu link]send update_aprom\n");
+		mcu_link_encode(MCULINK_UPDATE_APROM, buf, len+1);    
+		os_free(buf);
+	}
 }
 
 void mcu_link_send_update_config(uint8_t* data, uint8_t len)
@@ -129,7 +136,7 @@ bool ICACHE_FLASH_ATTR mcu_link_parse_char(uint8_t ch)
 			break;
 		case MCULINK_WAIT_CMD:
             checksum_buf[checksum_buf_index++] = ch;
-            checksum_buf[2] = ch;
+			link_cmd = ch;
             parse_step = MCULINK_WAIT_LEN;
 			break;
 		case MCULINK_WAIT_LEN:
@@ -151,7 +158,7 @@ bool ICACHE_FLASH_ATTR mcu_link_parse_char(uint8_t ch)
 			}
 			break;
 		case MCULINK_WAIT_CHECKSUM:
-            checksum = mcu_link_get_checksum(checksum_buf, data_len+MCULINK_PACKAGE_MIN_SIZE-1);
+            checksum = mcu_link_get_checksum(checksum_buf, data_len+MCULINK_PACKAGE_MIN_SIZE-2);
 			if(ch == checksum) {
 				ret = true;
 			} else {
@@ -169,9 +176,9 @@ bool ICACHE_FLASH_ATTR mcu_link_parse_char(uint8_t ch)
 
 uint8_t ICACHE_FLASH_ATTR mcu_link_msg_handle(void)
 {
-	uint8_t cmd = recv_data[4];
-	uint8_t param_len = recv_data[5];
-	uint8_t* param = &recv_data[6];
+	uint8_t cmd = link_cmd;
+	uint8_t param_len = data_len;
+	uint8_t* param = recv_data;
 
 	//os_printf("param_len:%d\n", param_len);
 

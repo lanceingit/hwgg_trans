@@ -8,6 +8,7 @@
 #include "protocol.h"
 #include "timer.h"
 #include <stdlib.h>
+#include "c_types.h"
 
 
 #define RETRY_CNT 		3
@@ -18,13 +19,15 @@ static uint32_t is_wait_mcu_boot_ack = false;
 static enum mcu_boot_status boot_status = MCUBOOT_IDEL;
 static times_t last_send_time;
 static uint16_t firmware_size;
+static uint16_t firmware_package_index=0;
 
 static uint8_t firmware_offset=0;
-static uint8_t firmware_buf[128];
+static uint8_t firmware_buf[128] STORE_ATTR;
 
 void set_mcu_in_boot(void)
 {
     is_mcu_in_boot = true;
+    boot_status = MCUBOOT_CONNECT;
 }
 
 void set_mcu_connected(void)
@@ -38,9 +41,9 @@ void mcu_boot_start(void)
 }
 
 
-void mcu_boot_send_firmware_package(uint8_t* data, uint8_t len)
+void mcu_boot_send_firmware_package(uint8_t index, uint8_t* data, uint8_t len)
 {
-    mcu_link_send_update_aprom(data, len);
+    mcu_link_send_update_aprom(index, data, len);
     last_send_time = timer_now();
     resend_try = 0;
 }
@@ -52,13 +55,14 @@ void mcu_boot_handle(uint8_t cmd, uint8_t* param, uint8_t param_len)
         os_printf("[mcu boot]recv MCULINK_CONNECT, result:%d\n", param[0]);
         if(param[0] == 1) {
             boot_status = MCUBOOT_SEND_FIRMWARE;
-            uint8_t tmp[5];
+            uint8_t tmp[5] STORE_ATTR;
             spi_flash_read(MCU_FIRMWARE_SIZE_ADDR, (uint32_t*)tmp, 5);
             firmware_size = atoi(tmp);
             os_printf("firmware_size:%d\n", firmware_size);
             firmware_offset = 0;
+            firmware_package_index = 0;
             spi_flash_read(MCU_FIRMWARE_ADDR+firmware_offset, (uint32_t*)firmware_buf, 128);
-            mcu_boot_send_firmware_package(firmware_buf, 128);
+            mcu_boot_send_firmware_package(firmware_package_index, firmware_buf, 128);
         }
 		break;
 	case MCULINK_UPDATE_APROM:
@@ -66,10 +70,11 @@ void mcu_boot_handle(uint8_t cmd, uint8_t* param, uint8_t param_len)
         if(boot_status == MCUBOOT_SEND_FIRMWARE) {
             if(param[0] == 1) {
                 firmware_offset += 128;
+                firmware_package_index++;
             }
             if(firmware_offset < firmware_size) {
                 spi_flash_read(MCU_FIRMWARE_ADDR+firmware_offset, (uint32_t*)firmware_buf, 128);
-                mcu_boot_send_firmware_package(firmware_buf, 128);
+                mcu_boot_send_firmware_package(firmware_package_index, firmware_buf, 128);
             } else {
                 boot_status = MCUBOOT_BOOT_FINISH;
                 spi_flash_erase_sector(MCU_UPGRADE_SECTOR);
@@ -104,7 +109,7 @@ void mcu_boot_run(void)
                 if(resend_try < RETRY_CNT)
                 {
                     spi_flash_read(MCU_FIRMWARE_ADDR+firmware_offset, (uint32_t*)firmware_buf, 128);
-                    mcu_boot_send_firmware_package(firmware_buf, 128);
+                    mcu_boot_send_firmware_package(firmware_package_index, firmware_buf, 128);
                     resend_try++;   
                 }
             }

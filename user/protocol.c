@@ -208,7 +208,7 @@ uint8_t ICACHE_FLASH_ATTR protocol_msg_handle(void)
 		//net_abort();
 		//2.软件复位
 		system_restart();
-		//3.看门狗复位
+		//3.看门狗复�?
 		//while(1);
 		break;
 	case CMD_TRANS_VERSION:
@@ -216,7 +216,8 @@ uint8_t ICACHE_FLASH_ATTR protocol_msg_handle(void)
 		protocol_send(PROTOCOL_CH_UART, cmd, false, version_get_major());
 		break;		
 	case CMD_MCU_UPGRADE:
-		protocol_step = STATUS_WAIT_RECV;
+		os_printf("recv cmd:CMD_MCU_UPGRADE!\n");
+		protocol_step = STATUS_IDLE;
 		set_mcu_in_boot();
 		break;
 	default:break;					
