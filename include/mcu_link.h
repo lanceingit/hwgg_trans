@@ -41,7 +41,7 @@ void mcu_link_update(void);
 void mcu_link_set_recv(uint8_t* data, uint16_t len);
 bool mcu_link_msg_parse(uint8_t* data, uint16_t len, uint8_t* msg_id);
 
-void mcu_link_send_connect(void);
+void mcu_link_send_connect(uint16_t firmware_size);
 void mcu_link_send_update_aprom(uint8_t index, uint8_t* data, uint8_t len);
 void mcu_link_send_update_config(uint8_t* data, uint8_t len);
 void mcu_link_send_run_aprom(void);

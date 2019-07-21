@@ -35,7 +35,13 @@ static uint32_t recv_sn;
 
 bool protocol_is_need_trans(uint8_t msg)
 {
-	if(msg==CMD_RECONNECT || msg==CMD_TRANS_VERSION) {
+	if(msg==CMD_RECONNECT 
+	|| msg==CMD_TRANS_VERSION
+    || msg==CMD_MCU_UPGRADE
+    || msg==CMD_MCU_UPGRADE_READY  
+    || msg==CMD_MCU_UPGRADE_STATUS 
+    || msg==CMD_MCU_UPGRADE_REQUEST
+	) {
 		return false;
 	} else {
 		return true;
@@ -65,7 +71,7 @@ void ICACHE_FLASH_ATTR protocol_encode(uint8_t ch, uint8_t* data, uint8_t len)
 {
 	protocol_buf[0] = HEAD1;
 	protocol_buf[1] = HEAD2;
-	protocol_buf[2] = SEND_MASK;
+	protocol_buf[2] = RECV_MASK;
 	protocol_buf[3] = BYTE3_MASK;
 	protocol_buf[4] = 1+4+len;
 	protocol_buf[5] = DEV_TYPE;
@@ -103,6 +109,10 @@ int8_t ICACHE_FLASH_ATTR protocol_send(uint8_t ch, uint8_t cmd, bool need_ack, .
 		datalen += 1;
 		break;		
 	case CMD_MCU_UPGRADE:
+		break;		
+	case CMD_MCU_UPGRADE_REQUEST:
+		send_buf[1] = va_arg(args, int);
+		datalen += 1;	
 		break;		
 	default:break;	
 	}
@@ -191,6 +201,20 @@ bool ICACHE_FLASH_ATTR protocol_parse_char(uint8_t ch)
 	return ret;
 }
 
+void ICACHE_FLASH_ATTR protocol_msg_timeout_handle(void)
+{
+	uint8_t cmd = send_buf[5];
+	uint8_t* param = &send_buf[6];
+	uint8_t param_len = datalen - 6;
+
+	switch(cmd) {
+		case CMD_MCU_UPGRADE_STATUS:
+			mcu_boot_start();
+			break;
+		default:break;
+	}
+}
+
 uint8_t ICACHE_FLASH_ATTR protocol_msg_handle(void)
 {
 	uint8_t cmd = recv_data[5];
@@ -208,7 +232,7 @@ uint8_t ICACHE_FLASH_ATTR protocol_msg_handle(void)
 		//net_abort();
 		//2.软件复位
 		system_restart();
-		//3.看门狗复�?
+		//3.看门狗复位
 		//while(1);
 		break;
 	case CMD_TRANS_VERSION:
@@ -218,7 +242,27 @@ uint8_t ICACHE_FLASH_ATTR protocol_msg_handle(void)
 	case CMD_MCU_UPGRADE:
 		os_printf("recv cmd:CMD_MCU_UPGRADE!\n");
 		protocol_step = STATUS_IDLE;
+		set_mcu_need_upgrade();
 		set_mcu_in_boot();
+		protocol_send(PROTOCOL_CH_UART, CMD_MCU_UPGRADE_READY, false);  
+		break;
+	case CMD_MCU_UPGRADE_REQUEST:
+		os_printf("recv cmd:CMD_MCU_UPGRADE_REQUEST!\n");
+		if(param[0] == 2) {
+			protocol_send(PROTOCOL_CH_UART, cmd, false, 1);
+			set_mcu_in_boot();
+		}
+		else if(param[0] == 1) {
+//			protocol_send(PROTOCOL_CH_UART, CMD_GET_FIRMWARE_VER, true);
+//			protocol_send(PROTOCOL_CH_UART, cmd, false, 0);
+			protocol_send(PROTOCOL_CH_UART, cmd, false, 1);
+			mcu_boot_start();
+		}
+		break;
+	case CMD_MCU_UPGRADE_STATUS:	
+		os_printf("recv cmd:CMD_MCU_UPGRADE_STATUS!\n");
+		protocol_step = STATUS_IDLE;
+		set_mcu_upgrade_success();
 		break;
 	default:break;					
 	}
@@ -267,6 +311,9 @@ void ICACHE_FLASH_ATTR protocol_update(void)
 			{
 				protocol_resend();
 				resend_try++; 
+			} else {
+				protocol_msg_timeout_handle();
+				protocol_step = STATUS_IDLE;
 			}
 		}		
     }	

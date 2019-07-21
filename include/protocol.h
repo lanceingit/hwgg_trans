@@ -109,7 +109,13 @@ app暂无此操作
 #define CMD_GET_VERSION         0x08
 #define CMD_RECONNECT           0x0B
 #define CMD_TRANS_VERSION       0x0C
+#define CMD_REQUEST_UPGRADE     0xA0
+#define CMD_UPGRADE_STATUS      0xA1
+#define CMD_GET_FIRMWARE_VER    0xA2
 #define CMD_MCU_UPGRADE         0xA4
+#define CMD_MCU_UPGRADE_READY   0xAB
+#define CMD_MCU_UPGRADE_STATUS  0xAD
+#define CMD_MCU_UPGRADE_REQUEST 0xB4
 
 
 enum parse_status

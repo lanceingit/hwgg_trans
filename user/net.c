@@ -57,6 +57,8 @@ void ICACHE_FLASH_ATTR user_esp_platform_dns_found(const char *name, ip_addr_t* 
 
 void ICACHE_FLASH_ATTR net_send(uint8_t* pdata, uint16_t len)
 {
+	//if(server_conn.state==ESPCONN_NONE || server_conn.state==ESPCONN_CLOSE) return; 
+
 	os_printf("tcp send:");
 	for(uint16_t i=0; i<len; i++) {
 		os_printf("%02x ", pdata[i]);
@@ -209,11 +211,11 @@ void ICACHE_FLASH_ATTR net_update(void)
 }
 
 /*
-  0-3�?len=4   magic:0xABABFFDC
-  4-7�?len=4   ip
-  8-9�?len=2	port
-   10:  len=1   is_use_ip. =1 use ip; =0 use domain 
-11-99�?len=89  domain(string)
+  0-3: len=4   magic:0xABABFFDC
+  4-7: len=4   ip
+  8-9: len=2   port
+   10: len=1   is_use_ip. =1 use ip; =0 use domain 
+11-99: len=89  domain(string)
 */
 void ICACHE_FLASH_ATTR net_init(net_conn_cb* cb)
 {

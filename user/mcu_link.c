@@ -31,10 +31,12 @@ static uint8_t link_seq=0;
 
 void mcu_link_encode(uint8_t cmd, uint8_t* data, uint8_t len);
 
-void mcu_link_send_connect(void)
+
+void mcu_link_send_connect(uint16_t firmware_size)
 {
     os_printf("[mcu link]send connect\n");
-    mcu_link_encode(MCULINK_CONNECT, NULL, 0);    
+	uint8_t package_num = firmware_size/128+(firmware_size%128)?1:0;
+    mcu_link_encode(MCULINK_CONNECT, &package_num, 1);    
 }
 
 void mcu_link_send_update_aprom(uint8_t index, uint8_t* data, uint8_t len)
@@ -102,7 +104,7 @@ void ICACHE_FLASH_ATTR mcu_link_encode(uint8_t cmd, uint8_t* data, uint8_t len)
 	mcu_link_buf[3] = cmd;
 	mcu_link_buf[4] = len;
 	memcpy(&mcu_link_buf[5], data, len);
-	mcu_link_buf[5+len] = mcu_link_get_checksum(&mcu_link_buf[0], mcu_link_buf[4]+3);
+	mcu_link_buf[5+len] = mcu_link_get_checksum(&mcu_link_buf[0], mcu_link_buf[4]+5);
 	mcu_link_buf[6+len] = MCULINK_TAIL;
 
 	mcu_link_trans(mcu_link_buf, mcu_link_buf[4]+MCULINK_PACKAGE_MIN_SIZE);

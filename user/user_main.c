@@ -101,19 +101,19 @@ void ICACHE_FLASH_ATTR key_func(void)
 	is_key_long_press = key_is_long_press();
 	if(is_key_long_press != last_is_key_long_press) {
 		if(is_key_long_press) {
-			// if(is_in_smartconfig) {
-			// 	if(smartconfig_end() == true) {
-			// 		is_in_smartconfig = false;	
-			// 		wifi_station_connect();
-			// 	}
-			// } else {
-			// 	smartconfig_done=true;
-			// 	if(smartconfig_begin(smartconfig_callback) == true) {
-			// 		is_in_smartconfig = true;
-			// 		smartconfig_start_time = system_get_time();
-			// 	}
-			// }
-			mcu_boot_start();
+			if(is_in_smartconfig) {
+				if(smartconfig_end() == true) {
+					is_in_smartconfig = false;	
+					wifi_station_connect();
+				}
+			} else {
+				smartconfig_done=true;
+				if(smartconfig_begin(smartconfig_callback) == true) {
+					is_in_smartconfig = true;
+					smartconfig_start_time = system_get_time();
+				}
+			}
+			//mcu_boot_start();
 		}	
 	}
 	last_is_key_long_press = is_key_long_press;
