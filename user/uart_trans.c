@@ -8,8 +8,10 @@
 #include "net.h"
 #include "protocol.h"
 #include "mcu_link.h"
+#include "mcu_boot.h"
+#include "upgrade_func.h"
 
-uint8 uart_buf[128]={0};
+static uint8 uart_buf[128]={0};
 extern UartDevice    UartDev;
 
 LOCAL struct UartBuffer* pTxBuffer = NULL;
@@ -377,13 +379,17 @@ void ICACHE_FLASH_ATTR uart_trans_update(void)
 		}
 		os_printf("\n");
 
-        uint8_t msg;
-        if(protocol_msg_parse(uart_buf, len, &msg)) {
-            if(protocol_is_need_trans(msg)) {
-                net_send(uart_buf, len);
+        if(get_is_mcu_in_boot()) {
+            mcu_link_set_recv(uart_buf, len);
+        }
+        else {
+            uint8_t msg;
+            if(protocol_msg_parse(uart_buf, len, &msg)) {
+                if(protocol_is_need_trans(msg)) {
+                    net_send(uart_buf, len);
+                }
             }
         }
-        mcu_link_set_recv(uart_buf, len);
 	}
 }
 

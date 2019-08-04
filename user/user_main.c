@@ -36,6 +36,8 @@
 #include "mcu_link.h"
 #include "mcu_boot.h"
 #include <stdlib.h>
+#include "upgrade_func.h"
+#include "timer.h"
 
 
 bool is_in_smartconfig = false;
@@ -79,7 +81,7 @@ void ICACHE_FLASH_ATTR send_mac(void)
 	uart_trans_send(buf, sizeof(buf));	
 }
 
-void ICACHE_FLASH_ATTR net_connect_callback(void* param)
+void ICACHE_FLASH_ATTR server_connect_callback(void* param)
 {
 	if(smartconfig_done) {
 		send_mac();
@@ -113,7 +115,6 @@ void ICACHE_FLASH_ATTR key_func(void)
 					smartconfig_start_time = system_get_time();
 				}
 			}
-			//mcu_boot_start();
 		}	
 	}
 	last_is_key_long_press = is_key_long_press;
@@ -133,40 +134,55 @@ void ICACHE_FLASH_ATTR net_func(void)
 	}
 }
 
-void uart_func(void)
+void ICACHE_FLASH_ATTR protocol_func(void)
+{
+	protocol_update();
+}
+
+void ICACHE_FLASH_ATTR uart_func(void)
 {
 	uart_trans_update();
 }
 
-void mcu_boot_func(void)
+void ICACHE_FLASH_ATTR mcu_link_func(void)
+{
+	mcu_link_update();
+}
+
+void ICACHE_FLASH_ATTR mcu_boot_func(void)
 {
 	mcu_boot_run();
 }
 
-void mcu_link_func(void)
+void ICACHE_FLASH_ATTR upgrade_func(void)
 {
-	mcu_link_update();
+	upgrade_update();
 }
 
 void ICACHE_FLASH_ATTR main_func(void* arvg)
 {
 	key_func();
 	net_func();
+	protocol_func();
 	uart_func();
 	mcu_link_func();
 	mcu_boot_func();
+	upgrade_func();
 }
 
 void ICACHE_FLASH_ATTR user_init(void)
 {
+	timer_init();
 	uart_trans_init();	
     os_printf("SDK version:%s\n", system_get_sdk_version());
+	os_printf("curr user:%d\n", system_upgrade_userbin_check()+1);
 
 	key_init();
 	protocol_init();
-	net_init(net_connect_callback);	
+	net_init(server_connect_callback);	
 	mcu_link_init();
 	mcu_boot_init();
+	upgrade_init();
 
 	os_timer_setfn(&main_timer, main_func, NULL);
 	os_timer_arm(&main_timer, MAIN_LOOP_MS, 1);	

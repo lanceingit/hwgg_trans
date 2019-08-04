@@ -139,7 +139,7 @@ enum protocol_status
 
 void protocol_init(void);
 void protocol_update(void);
-void protocol_set_recv(uint8_t* data, uint16_t len);
+void protocol_set_recv(uint8_t* data, uint8_t len);
 bool protocol_msg_parse(uint8_t* data, uint16_t len, uint8_t* msg_id);
 bool protocol_is_need_trans(uint8_t msg_id);
 int8_t protocol_send(uint8_t ch, uint8_t cmd, bool need_ack, ...);

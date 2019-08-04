@@ -10,6 +10,7 @@
 #include "net.h"
 
 #include "mem.h"
+#include "utils.h"
 
 config_callback* config_cb;
 
@@ -32,7 +33,7 @@ static char port[PORT_SIZE_MAX] = {0};
 {  ssid },{  password  },{  domain   },{ip},{port}
 {Netcore},{tcl123698745},{jl.hwei.net},{  },{8960}
 */
-bool smartconfig_decode(char* data, char* ssid, char* password, char* domain, char* ip, char* port)
+bool ICACHE_FLASH_ATTR smartconfig_decode(char* data, char* ssid, char* password, char* domain, char* ip, char* port)
 {
 	char buf[BUF_SIZE_MAX+1] = {0};
 	uint8_t i=0;
@@ -127,7 +128,7 @@ decode_err:
     return false;
 }
 
-void ip_atoi(char* ip_str, uint8_t* ip_int)
+void ICACHE_FLASH_ATTR ip_atoi(char* ip_str, uint8_t* ip_int)
 {
 	char ip_char[4] = {'\0'};
     uint8_t ip_int_index = 0;
@@ -218,7 +219,7 @@ void ICACHE_FLASH_ATTR smartconfig_done_cb(sc_status status, void *pdata)
                     }
                     net_set_port(port_num);
 
-                    if(system_param_save_with_protect(NET_CONFIG_SECTOR, buf, 100) == false) {
+                    if(system_param_save_with_protect(ADDR2SECTOR(NET_CONFIG_ADDR), buf, 100) == false) {
                         os_printf("net config save fail!\n");    
                     }   
                     os_free(buf);

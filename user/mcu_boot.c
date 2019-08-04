@@ -9,26 +9,26 @@
 #include "timer.h"
 #include <stdlib.h>
 #include "c_types.h"
+#include "utils.h"
+#include "http_func.h"
+#include "upgrade_func.h"
 
 
-#define RETRY_CNT 		3
+#define RETRY_CNT 		    3
+#define BOOT_CONNECT_CNT    30
 
 #define UPGRADE_NONE        0
 #define UPGRADE_PROCESS     1
 #define UPGRADE_DONE        2
 
-typedef struct {
-    uint32_t magic;
-    uint32_t is_need_upgrade;
-    uint32_t upgrade_status;  //0:none 1:In the process 2:done
-} McuBootInfo;
-
-uint8_t resend_try=0;
+static uint8_t resend_try=0;
 static bool is_mcu_in_boot = false;
 
 static McuBootInfo mcu_boot_info STORE_ATTR = {0,false,0};
-static enum mcu_boot_status boot_status = MCUBOOT_IDEL;
+static McuBootState boot_status = MCUBOOT_IDEL;
 static times_t last_send_time;
+static times_t boot_connect_time;
+static uint8_t boot_connect_cnt=0;
 static uint16_t firmware_size;
 static uint16_t firmware_package_index=0;
 
@@ -36,58 +36,75 @@ static uint32_t firmware_offset=0;
 static uint8_t firmware_buf[128] STORE_ATTR;
 
 
-McuBootInfo get_mcu_boot_info(void)
+McuBootInfo ICACHE_FLASH_ATTR get_mcu_boot_info(void)
 {
     McuBootInfo self;
     spi_flash_read(MCU_UPGRADE_INFO_ADDR, (uint32_t*)&self, sizeof(McuBootInfo));  
     return self;
 }
-void set_mcu_boot_info(McuBootInfo* self)
+void ICACHE_FLASH_ATTR set_mcu_boot_info(McuBootInfo* self)
 {
     self->magic = MCU_UPGRADE_INFO_MAGIC;
-    spi_flash_erase_sector(MCU_UPGRADE_INFO_SECTOR);
+    spi_flash_erase_sector(ADDR2SECTOR(MCU_UPGRADE_INFO_ADDR));
     spi_flash_write(MCU_UPGRADE_INFO_ADDR, (uint32_t*)self, sizeof(McuBootInfo));    
 }
 
-void set_mcu_upgrade_success(void)
+void ICACHE_FLASH_ATTR set_mcu_upgrade_success(void)
 {
     mcu_boot_info.is_need_upgrade = false;
     mcu_boot_info.upgrade_status = UPGRADE_NONE;
     set_mcu_boot_info(&mcu_boot_info);
 }
 
-void set_mcu_need_upgrade(void)
+void ICACHE_FLASH_ATTR set_mcu_need_upgrade(void)
 {
     mcu_boot_info.is_need_upgrade = true;
     mcu_boot_info.upgrade_status = UPGRADE_NONE;
     set_mcu_boot_info(&mcu_boot_info);
 }
 
-void set_mcu_in_boot(void)
+void ICACHE_FLASH_ATTR set_mcu_in_boot(void)
 {
     is_mcu_in_boot = true;
+    boot_connect_cnt = 0;
     boot_status = MCUBOOT_CONNECT;
 }
 
-void set_mcu_connected(void)
+void ICACHE_FLASH_ATTR mcu_upgrade_start(uint32_t firmware_size)
+{
+    mcu_boot_info.is_need_upgrade = true;
+    mcu_boot_info.upgrade_status = UPGRADE_NONE;
+    mcu_boot_info.firmware_size = firmware_size;
+    set_mcu_boot_info(&mcu_boot_info);
+    is_mcu_in_boot = true;
+    boot_connect_cnt = 0;
+    boot_status = MCUBOOT_CONNECT;
+}
+
+bool ICACHE_FLASH_ATTR get_is_mcu_in_boot(void)
+{
+    return is_mcu_in_boot;
+}
+
+void ICACHE_FLASH_ATTR set_mcu_connected(void)
 {
     boot_status = MCUBOOT_SEND_FIRMWARE;
 }
 
-void mcu_boot_start(void)
+void ICACHE_FLASH_ATTR mcu_boot_start(void)
 {
     protocol_send(PROTOCOL_CH_UART, CMD_MCU_UPGRADE, true);
 }
 
 
-void mcu_boot_send_firmware_package(uint8_t index, uint8_t* data, uint8_t len)
+void ICACHE_FLASH_ATTR mcu_boot_send_firmware_package(uint8_t index, uint8_t* data, uint8_t len)
 {
     mcu_link_send_update_aprom(index, data, len);
     last_send_time = timer_now();
     resend_try = 0;
 }
 
-void mcu_boot_handle(uint8_t cmd, uint8_t* param, uint8_t param_len)
+void ICACHE_FLASH_ATTR mcu_boot_handle(uint8_t cmd, uint8_t* param, uint8_t param_len)
 {
 	switch(cmd) {
 	case MCULINK_CONNECT:
@@ -132,7 +149,7 @@ void mcu_boot_handle(uint8_t cmd, uint8_t* param, uint8_t param_len)
 	}
 }
 
-void mcu_boot_run(void)
+void ICACHE_FLASH_ATTR mcu_boot_run(void)
 {
     if(is_mcu_in_boot) {
         switch (boot_status)
@@ -141,11 +158,20 @@ void mcu_boot_run(void)
             break;
         case MCUBOOT_CONNECT: 
         {
-            uint8_t tmp[5] STORE_ATTR;
-            spi_flash_read(MCU_FIRMWARE_SIZE_ADDR, (uint32_t*)tmp, 5);
-            firmware_size = atoi(tmp);
-            os_printf("firmware_size:%d\n", firmware_size);
-            mcu_link_send_connect(firmware_size);          
+            if(timer_check(&boot_connect_time, 100)) {
+                os_printf("firmware_size:%d\n", mcu_boot_info.firmware_size);
+                mcu_link_send_connect(mcu_boot_info.firmware_size);          
+                boot_connect_cnt++;
+                if(boot_connect_cnt > BOOT_CONNECT_CNT) {
+                    os_printf("mcu boot connect timeout!\n");
+                    boot_status = MCUBOOT_IDEL;
+                    is_mcu_in_boot = false;
+                    set_mcu_upgrade_result(UPGRADE_RET_CONNECT_ERR);
+                    mcu_boot_info.is_need_upgrade = false;
+                    mcu_boot_info.upgrade_status = UPGRADE_NONE;
+                    set_mcu_boot_info(&mcu_boot_info);                    
+                }
+            }
             break;
         }
         case MCUBOOT_SEND_FIRMWARE:     
@@ -175,7 +201,7 @@ void mcu_boot_run(void)
     }
 }
 
-void mcu_boot_init(void)
+void ICACHE_FLASH_ATTR mcu_boot_init(void)
 {
     mcu_boot_info = get_mcu_boot_info();
     if(mcu_boot_info.magic != MCU_UPGRADE_INFO_MAGIC) {
@@ -193,6 +219,7 @@ void mcu_boot_init(void)
             mcu_boot_start();
         } else if(mcu_boot_info.upgrade_status == UPGRADE_DONE) {
             protocol_send(PROTOCOL_CH_UART, CMD_MCU_UPGRADE_STATUS, true);
+            set_upgrade_wifi();
         }   
     }
 }

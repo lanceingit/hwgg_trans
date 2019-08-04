@@ -11,6 +11,8 @@
 #include "version.h"
 #include "timer.h"
 #include "mcu_boot.h"
+#include "upgrade_func.h"
+#include "version_func.h"
 
 #define RETRY_CNT 		3
 #define RECV_BUF_ZISE	255
@@ -33,7 +35,7 @@ static uint8_t recv_buf[256];
 static uint8_t recv_buf_len;
 static uint32_t recv_sn;
 
-bool protocol_is_need_trans(uint8_t msg)
+bool ICACHE_FLASH_ATTR protocol_is_need_trans(uint8_t msg)
 {
 	if(msg==CMD_RECONNECT 
 	|| msg==CMD_TRANS_VERSION
@@ -41,6 +43,7 @@ bool protocol_is_need_trans(uint8_t msg)
     || msg==CMD_MCU_UPGRADE_READY  
     || msg==CMD_MCU_UPGRADE_STATUS 
     || msg==CMD_MCU_UPGRADE_REQUEST
+    || msg==CMD_GET_FIRMWARE_VER
 	) {
 		return false;
 	} else {
@@ -71,7 +74,11 @@ void ICACHE_FLASH_ATTR protocol_encode(uint8_t ch, uint8_t* data, uint8_t len)
 {
 	protocol_buf[0] = HEAD1;
 	protocol_buf[1] = HEAD2;
-	protocol_buf[2] = RECV_MASK;
+    if(ch==PROTOCOL_CH_UART) {
+		protocol_buf[2] = RECV_MASK;
+	} else {
+		protocol_buf[2] = SEND_MASK;
+	}
 	protocol_buf[3] = BYTE3_MASK;
 	protocol_buf[4] = 1+4+len;
 	protocol_buf[5] = DEV_TYPE;
@@ -113,6 +120,8 @@ int8_t ICACHE_FLASH_ATTR protocol_send(uint8_t ch, uint8_t cmd, bool need_ack, .
 	case CMD_MCU_UPGRADE_REQUEST:
 		send_buf[1] = va_arg(args, int);
 		datalen += 1;	
+		break;		
+	case CMD_GET_FIRMWARE_VER:	
 		break;		
 	default:break;	
 	}
@@ -237,6 +246,7 @@ uint8_t ICACHE_FLASH_ATTR protocol_msg_handle(void)
 		break;
 	case CMD_TRANS_VERSION:
 		os_printf("recv cmd:CMD_TRANS_VERSION!\n");
+		set_mcu_ver(param[0]);
 		protocol_send(PROTOCOL_CH_UART, cmd, false, version_get_major());
 		break;		
 	case CMD_MCU_UPGRADE:
@@ -250,13 +260,14 @@ uint8_t ICACHE_FLASH_ATTR protocol_msg_handle(void)
 		os_printf("recv cmd:CMD_MCU_UPGRADE_REQUEST!\n");
 		if(param[0] == 2) {
 			protocol_send(PROTOCOL_CH_UART, cmd, false, 1);
-			set_mcu_in_boot();
+			set_upgrade_type(UPGRADE_TYPE_MCU_FORCE);
+			set_request_latest_version();
 		}
 		else if(param[0] == 1) {
-//			protocol_send(PROTOCOL_CH_UART, CMD_GET_FIRMWARE_VER, true);
-//			protocol_send(PROTOCOL_CH_UART, cmd, false, 0);
-			protocol_send(PROTOCOL_CH_UART, cmd, false, 1);
-			mcu_boot_start();
+			set_upgrade_type(UPGRADE_TYPE_MCU_REQUEST);
+			set_request_latest_version();
+//			protocol_send(PROTOCOL_CH_UART, cmd, false, 1);
+//			mcu_boot_start();
 		}
 		break;
 	case CMD_MCU_UPGRADE_STATUS:	
@@ -264,22 +275,28 @@ uint8_t ICACHE_FLASH_ATTR protocol_msg_handle(void)
 		protocol_step = STATUS_IDLE;
 		set_mcu_upgrade_success();
 		break;
+	case CMD_GET_FIRMWARE_VER:
+		os_printf("recv cmd:CMD_GET_FIRMWARE_VER!\n");
+		protocol_step = STATUS_IDLE;
+		os_printf("latest version:%d.%d.%d\n", param[0], param[1], param[2]);
+		set_upgrade_get_version(param);
+		break;	
 	default:break;					
 	}
 
 	return cmd;
 }
 
-void ICACHE_FLASH_ATTR protocol_set_recv(uint8_t* data, uint16_t len)
+void ICACHE_FLASH_ATTR protocol_set_recv(uint8_t* data, uint8_t len)
 {
 	memcpy(recv_buf, data, len);
 	recv_buf_len = len;
 }
 
-bool protocol_msg_parse(uint8_t* data, uint16_t len, uint8_t* msg_id)
+bool ICACHE_FLASH_ATTR protocol_msg_parse(uint8_t* data, uint16_t len, uint8_t* msg_id)
 {
 	uint8_t ch;
-	for(uint8_t i=0; i<len; i++) {
+	for(uint16_t i=0; i<len; i++) {
 		if(protocol_parse_char(data[i]))
 		{
 			// os_printf("get msg\n");
@@ -292,17 +309,25 @@ bool protocol_msg_parse(uint8_t* data, uint16_t len, uint8_t* msg_id)
 
 void ICACHE_FLASH_ATTR protocol_update(void)
 {
-	uint8_t ch;
-	for(uint8_t i=0; i<recv_buf_len; i++) {
-		if(protocol_parse_char(recv_buf[i]))
-		{
-			// os_printf("get msg\n");
-			protocol_msg_handle();
+	uint8_t msg;
+	if(protocol_msg_parse(recv_buf, recv_buf_len, &msg)) {
+		if(protocol_is_need_trans(msg)) {
+			uart_trans_send(recv_buf, recv_buf_len);
 		}
-		if(i+1 == recv_buf_len) {
-			recv_buf_len = 0;
-		}
+		recv_buf_len = 0;
 	}
+
+	// uint8_t ch;
+	// for(uint8_t i=0; i<recv_buf_len; i++) {
+	// 	if(protocol_parse_char(recv_buf[i]))
+	// 	{
+	// 		// os_printf("get msg\n");
+	// 		protocol_msg_handle();
+	// 	}
+	// 	if(i+1 == recv_buf_len) {
+	// 		recv_buf_len = 0;
+	// 	}
+	// }
 
     if(protocol_step == STATUS_WAIT_RECV)
     {

@@ -32,14 +32,14 @@ static uint8_t link_seq=0;
 void mcu_link_encode(uint8_t cmd, uint8_t* data, uint8_t len);
 
 
-void mcu_link_send_connect(uint16_t firmware_size)
+void ICACHE_FLASH_ATTR mcu_link_send_connect(uint16_t firmware_size)
 {
     os_printf("[mcu link]send connect\n");
 	uint8_t package_num = firmware_size/128+(firmware_size%128)?1:0;
     mcu_link_encode(MCULINK_CONNECT, &package_num, 1);    
 }
 
-void mcu_link_send_update_aprom(uint8_t index, uint8_t* data, uint8_t len)
+void ICACHE_FLASH_ATTR mcu_link_send_update_aprom(uint8_t index, uint8_t* data, uint8_t len)
 {
     if(len > 128) {
         os_printf("update aprom len exceed!\n");
@@ -55,7 +55,7 @@ void mcu_link_send_update_aprom(uint8_t index, uint8_t* data, uint8_t len)
 	}
 }
 
-void mcu_link_send_update_config(uint8_t* data, uint8_t len)
+void ICACHE_FLASH_ATTR mcu_link_send_update_config(uint8_t* data, uint8_t len)
 {
     if(len > 128) {
         os_printf("update aprom len exceed!\n");
@@ -65,7 +65,7 @@ void mcu_link_send_update_config(uint8_t* data, uint8_t len)
     mcu_link_encode(MCULINK_UPDATE_CONFIG, data, len);    
 }
 
-void mcu_link_send_run_aprom(void)
+void ICACHE_FLASH_ATTR mcu_link_send_run_aprom(void)
 {
     os_printf("[mcu link]send run_aprom\n");
     mcu_link_encode(MCULINK_RUN_APROM, NULL, 0);    
