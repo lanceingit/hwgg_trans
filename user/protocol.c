@@ -35,6 +35,9 @@ static uint8_t recv_buf[256];
 static uint8_t recv_buf_len;
 static uint32_t recv_sn;
 
+extern void exit_smartconfig(void);
+
+
 bool ICACHE_FLASH_ATTR protocol_is_need_trans(uint8_t msg)
 {
 	if(msg==CMD_RECONNECT 
@@ -246,6 +249,7 @@ uint8_t ICACHE_FLASH_ATTR protocol_msg_handle(void)
 		break;
 	case CMD_TRANS_VERSION:
 		os_printf("recv cmd:CMD_TRANS_VERSION!\n");
+		os_printf("mcu version:%d\n", param[0]);
 		set_mcu_ver(param[0]);
 		protocol_send(PROTOCOL_CH_UART, cmd, false, version_get_major());
 		break;		
@@ -259,11 +263,14 @@ uint8_t ICACHE_FLASH_ATTR protocol_msg_handle(void)
 	case CMD_MCU_UPGRADE_REQUEST:
 		os_printf("recv cmd:CMD_MCU_UPGRADE_REQUEST!\n");
 		if(param[0] == 2) {
+			os_printf("recv force upgrade!\n");
 			protocol_send(PROTOCOL_CH_UART, cmd, false, 1);
 			set_upgrade_type(UPGRADE_TYPE_MCU_FORCE);
 			set_request_latest_version();
 		}
 		else if(param[0] == 1) {
+			os_printf("recv request upgrade!\n");
+			exit_smartconfig();
 			set_upgrade_type(UPGRADE_TYPE_MCU_REQUEST);
 			set_request_latest_version();
 //			protocol_send(PROTOCOL_CH_UART, cmd, false, 1);

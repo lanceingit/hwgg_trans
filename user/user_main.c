@@ -38,6 +38,7 @@
 #include <stdlib.h>
 #include "upgrade_func.h"
 #include "timer.h"
+#include "version_func.h"
 
 
 bool is_in_smartconfig = false;
@@ -46,6 +47,13 @@ os_timer_t main_timer;
 uint32_t smartconfig_start_time;
 
 bool smartconfig_done=false;
+
+void ICACHE_FLASH_ATTR exit_smartconfig(void)
+{
+	smartconfig_end();
+	is_in_smartconfig = false;
+	wifi_station_connect();
+}
 
 void ICACHE_FLASH_ATTR send_mac(void)
 {
@@ -176,6 +184,7 @@ void ICACHE_FLASH_ATTR user_init(void)
 	uart_trans_init();	
     os_printf("SDK version:%s\n", system_get_sdk_version());
 	os_printf("curr user:%d\n", system_upgrade_userbin_check()+1);
+	os_printf("firmware version:%d.%d\n", version_get_major(), version_get_minor());
 
 	key_init();
 	protocol_init();

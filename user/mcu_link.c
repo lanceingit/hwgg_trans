@@ -34,8 +34,8 @@ void mcu_link_encode(uint8_t cmd, uint8_t* data, uint8_t len);
 
 void ICACHE_FLASH_ATTR mcu_link_send_connect(uint16_t firmware_size)
 {
-    os_printf("[mcu link]send connect\n");
 	uint8_t package_num = firmware_size/128+(firmware_size%128)?1:0;
+    os_printf("[mcu link]send connect package_num:%d\n", package_num);
     mcu_link_encode(MCULINK_CONNECT, &package_num, 1);    
 }
 

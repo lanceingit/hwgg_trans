@@ -29,3 +29,4 @@ bool get_is_mcu_in_boot(void);
 void set_mcu_connected(void);
 void set_mcu_upgrade_get_version(uint8_t* ver);
 void mcu_upgrade_start(uint32_t firmware_size);
+void set_mcu_firmware_size(uint32_t firmware_size);

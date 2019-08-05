@@ -67,7 +67,7 @@ bool ICACHE_FLASH_ATTR get_is_mcu_in_upgrade(void)
 
 void ICACHE_FLASH_ATTR set_request_latest_version(void)
 {
-    if(get_is_conncect_server) {
+    if(get_is_conncect_server()) {
         protocol_send(PROTOCOL_CH_NET, CMD_GET_FIRMWARE_VER, true);
         request_latest_version = false;
     } else {
@@ -88,6 +88,7 @@ void ICACHE_FLASH_ATTR set_mcu_upgrade_result(UpgradeResult ret)
 
 void ICACHE_FLASH_ATTR set_upgrade_get_version(uint8_t* ver)
 {
+    request_latest_version = false;
     os_printf("latest version:%d.%d.%d\n", ver[0], ver[1], ver[2]);
     if(upgrade_type != UPGRADE_TYPE_MCU_FORCE) {
         os_printf("mcu version:%d wifi version:%d\n", get_mcu_ver(), version_get_major());
@@ -222,10 +223,17 @@ void upgrade_mcu_save(void)
             upgrade_state = UPGRADE_STATE_UPDATE_END;
         } 
         else {
+            protocol_send(PROTOCOL_CH_UART, CMD_MCU_UPGRADE_REQUEST, false, 0);
             upgrade_state = UPGRADE_STATE_UPDATE_WIFI;
         }
     } else {
-        mcu_upgrade_start(mcu_firmware_size);           
+        if(upgrade_type == UPGRADE_TYPE_MCU_FORCE) {
+            mcu_upgrade_start(mcu_firmware_size);           
+        }
+        else {
+            set_mcu_firmware_size(mcu_firmware_size);
+            mcu_boot_start();
+        }
         upgrade_state = UPGRADE_STATE_UPDATE_MCU;
     }
 }
@@ -484,6 +492,7 @@ void upgrade_update(void)
 	if(system_get_time() - request_ver_check_timer > (100)) {
         if(request_latest_version) {
             if(get_is_conncect_server()) {
+                os_printf("upgrade request latest version!\n");
                 protocol_send(PROTOCOL_CH_NET, CMD_GET_FIRMWARE_VER, true);
                 request_latest_version = true;
             }
@@ -533,7 +542,7 @@ void upgrade_init(void)
         upgrade_info.is_need_upgrade = false;
         set_upgrade_info(&upgrade_info);
     } else {
-        os_printf("upgrade info:%d\n", upgrade_info.upgrade_type);
+        os_printf("upgrade info:%d %d\n", upgrade_info.upgrade_type, upgrade_info.is_need_upgrade);
         if(upgrade_info.upgrade_type != UPGRADE_TYPE_MCU_FORCE) {
             if(upgrade_info.is_need_upgrade) {
                 upgrade_state = UPGRADE_STATE_UPDATE_WIFI;

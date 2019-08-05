@@ -38,7 +38,7 @@ void ICACHE_FLASH_ATTR key_update(void)
 	{
 		if(key_short_press == false) {
 			os_printf("key press\n");
-			protocol_send(PROTOCOL_CH_NET, CMD_GET_FIRMWARE_VER, true);
+//			protocol_send(PROTOCOL_CH_NET, CMD_GET_FIRMWARE_VER, true);
 		}
 		key_short_press = true;
 	}
