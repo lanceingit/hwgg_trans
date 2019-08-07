@@ -13,6 +13,7 @@
 #include "http_func.h"
 #include "version_func.h"
 #include "mcu_boot.h"
+#include "key.h"
 
 #define UPGRADE_RETRY_MAX   3
 
@@ -240,6 +241,9 @@ void upgrade_mcu_save(void)
 
 void upgrade_wifi(void)
 {   
+    upgrade_info.is_need_upgrade = false;
+    set_upgrade_info(&upgrade_info);        
+
     os_printf("upgrade wifi!\n");
     spi_flash_read(DOWNLOAD_FILE_ADDR, (uint32_t*)read_buf, 8);
     uint8_t device_type = read_buf[0];
@@ -326,7 +330,8 @@ void upgrade_handle(void)
     bool wifi_checksum_ret = upgrade_firmware_phase(start_addr, write_addr, true);
     if(wifi_checksum_ret == true) {
         system_upgrade_flag_set(UPGRADE_FLAG_FINISH);
-        system_upgrade_reboot();        
+        system_upgrade_reboot();   
+        while(1);     
     } else {
         os_printf("wifi firmware crc err!\n");
         goto upgrade_err;
@@ -543,9 +548,17 @@ void upgrade_init(void)
         set_upgrade_info(&upgrade_info);
     } else {
         os_printf("upgrade info:%d %d\n", upgrade_info.upgrade_type, upgrade_info.is_need_upgrade);
-        if(upgrade_info.upgrade_type != UPGRADE_TYPE_MCU_FORCE) {
-            if(upgrade_info.is_need_upgrade) {
-                upgrade_state = UPGRADE_STATE_UPDATE_WIFI;
+        if(key_is_press()) {
+            os_printf("key press in power on, clear upgrade boot info!\n");            
+            upgrade_info.is_need_upgrade = false;
+            set_upgrade_info(&upgrade_info);            
+        } else {
+            if(upgrade_info.upgrade_type != UPGRADE_TYPE_MCU_FORCE) {
+                if(upgrade_info.is_need_upgrade) {
+                    if(!get_is_mcu_need_upgrade_first()) {
+                        upgrade_state = UPGRADE_STATE_UPDATE_WIFI;
+                    }
+                }
             }
         }
     }

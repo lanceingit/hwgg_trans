@@ -27,6 +27,7 @@ uint32_t wifi_check_timer;
 uint32_t dns_check_timer; 
 uint32_t server_conn_check_timer; 
 static net_conn_cb* user_server_connect_cb;
+static esp_tcp tcp_buf;
 
 bool ICACHE_FLASH_ATTR get_is_conncect_server(void) 
 {
@@ -175,13 +176,6 @@ void ICACHE_FLASH_ATTR server_connect(void)
 {
 	struct ip_info local_ip;
 
-	if(server_conn.proto.tcp == NULL) {
-		server_conn.proto.tcp = (esp_tcp *) os_zalloc(sizeof(esp_tcp));
-		if(server_conn.proto.tcp == NULL) {
-			os_printf("[WARN]conn alloc fail!\n");
-			return;
-		}  
-	}
 	server_conn.type = ESPCONN_TCP; 
 
 	if(use_ip) {
@@ -205,13 +199,6 @@ void ICACHE_FLASH_ATTR server_connect_port(uint16_t port, espconn_connect_callba
 {
 	struct ip_info local_ip;
 
-	if(server_conn.proto.tcp == NULL) {
-		server_conn.proto.tcp = (esp_tcp *) os_zalloc(sizeof(esp_tcp));
-		if(server_conn.proto.tcp == NULL) {
-			os_printf("[WARN]conn alloc fail!\n");
-			return;
-		}  
-	}
 	server_conn.type = ESPCONN_TCP; 
 
 	if(use_ip) {
@@ -258,7 +245,7 @@ void ICACHE_FLASH_ATTR net_update(void)
 	}
 
 	if(system_get_time() - server_conn_check_timer > (SERVER_CONN_CHECK_MS*1000)) {
-		os_printf("server_conn.state:%d\n",server_conn.state);
+		os_printf("port:%d server_conn.state:%d\n",server_conn.proto.tcp->remote_port, server_conn.state);
 		if((server_conn.state == ESPCONN_NONE || server_conn.state == ESPCONN_CLOSE) 
 		    && is_wifi_connect 
 			&& get_upgrade_state() == UPGRADE_STATE_IDLE
@@ -300,4 +287,5 @@ void ICACHE_FLASH_ATTR net_init(net_conn_cb* cb)
 
 	server_conn.proto.tcp = NULL;
 	user_server_connect_cb = cb;
+	server_conn.proto.tcp = &tcp_buf;
 }

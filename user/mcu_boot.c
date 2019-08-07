@@ -12,6 +12,7 @@
 #include "utils.h"
 #include "http_func.h"
 #include "upgrade_func.h"
+#include "key.h"
 
 
 #define RETRY_CNT 		    3
@@ -90,6 +91,11 @@ void ICACHE_FLASH_ATTR set_mcu_firmware_size(uint32_t firmware_size)
 bool ICACHE_FLASH_ATTR get_is_mcu_in_boot(void)
 {
     return is_mcu_in_boot;
+}
+
+bool ICACHE_FLASH_ATTR get_is_mcu_need_upgrade_first(void)
+{
+    return (mcu_boot_info.is_need_upgrade || mcu_boot_info.upgrade_status == UPGRADE_PROCESS);
 }
 
 void ICACHE_FLASH_ATTR set_mcu_connected(void)
@@ -219,14 +225,21 @@ void ICACHE_FLASH_ATTR mcu_boot_init(void)
         set_mcu_boot_info(&mcu_boot_info);
     } else {
         os_printf("mcu boot info:%d %d\n", mcu_boot_info.is_need_upgrade, mcu_boot_info.upgrade_status);
-        if(mcu_boot_info.is_need_upgrade == true) {
-            set_mcu_in_boot();
+        if(key_is_press()) {
+            os_printf("key press in power on, clear mcu boot info!\n");            
+            mcu_boot_info.is_need_upgrade = false;
+            mcu_boot_info.upgrade_status = UPGRADE_NONE;
+            set_mcu_boot_info(&mcu_boot_info);            
+        } else {
+            if(mcu_boot_info.is_need_upgrade == true) {
+                set_mcu_in_boot();
+            }
+            if(mcu_boot_info.upgrade_status == UPGRADE_PROCESS) {
+                mcu_boot_start();
+            } else if(mcu_boot_info.upgrade_status == UPGRADE_DONE) {
+                protocol_send(PROTOCOL_CH_UART, CMD_MCU_UPGRADE_STATUS, true);
+            }   
         }
-        if(mcu_boot_info.upgrade_status == UPGRADE_PROCESS) {
-            mcu_boot_start();
-        } else if(mcu_boot_info.upgrade_status == UPGRADE_DONE) {
-            protocol_send(PROTOCOL_CH_UART, CMD_MCU_UPGRADE_STATUS, true);
-        }   
     }
 }
 
