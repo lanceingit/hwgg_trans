@@ -43,6 +43,7 @@
 
 bool is_in_smartconfig = false;
 bool last_is_key_long_press = false;
+bool is_super_key=false;
 os_timer_t main_timer;
 uint32_t smartconfig_start_time;
 
@@ -110,7 +111,7 @@ void ICACHE_FLASH_ATTR key_func(void)
 
 	is_key_long_press = key_is_long_press();
 	if(is_key_long_press != last_is_key_long_press) {
-		if(is_key_long_press) {
+		if(is_key_long_press && !is_super_key) {
 			if(is_in_smartconfig) {
 				if(smartconfig_end() == true) {
 					is_in_smartconfig = false;	
@@ -192,6 +193,10 @@ void ICACHE_FLASH_ATTR user_init(void)
 	mcu_link_init();
 	mcu_boot_init();
 	upgrade_init();
+
+	if(key_is_press()) {
+		is_super_key = true;
+	}
 
 	os_timer_setfn(&main_timer, main_func, NULL);
 	os_timer_arm(&main_timer, MAIN_LOOP_MS, 1);	
