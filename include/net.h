@@ -18,10 +18,5 @@ void server_connect(void);
 void server_connect_port(uint16_t port, espconn_connect_callback connect_cb);
 void server_abort(void);
 
-void net_set_ip(uint8_t* ip);
-void net_set_port(uint16_t port);
-void net_set_domain(char* domai);
-void net_set_use_ip(bool use);
-
 bool get_is_conncect_server(void);
 

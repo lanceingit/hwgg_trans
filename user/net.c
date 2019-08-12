@@ -15,11 +15,10 @@
 
 struct espconn server_conn;
 
-char server_ip[4];
+const char server_ip[4] = SERVER_IP;
 char dns_ip[4];
-uint16_t server_port;
-char server_domain[100];
-bool use_ip;
+const uint16_t server_port=SERVER_PORT;
+const char server_domain[]=SERVER_DOMAIN;
 DnsState dns_state=DNS_STATE_NO_FOUND;
 
 bool is_wifi_connect=false;
@@ -32,26 +31,6 @@ static esp_tcp tcp_buf;
 bool ICACHE_FLASH_ATTR get_is_conncect_server(void) 
 {
 	return !(server_conn.state==ESPCONN_NONE || server_conn.state==ESPCONN_CLOSE);
-}
-
-void ICACHE_FLASH_ATTR net_set_ip(uint8_t* ip) 
-{
-	memcpy(server_ip, ip, 4);
-}
-
-void ICACHE_FLASH_ATTR net_set_port(uint16_t port) 
-{
-	server_port = port;
-}
-
-void ICACHE_FLASH_ATTR net_set_domain(char* domai) 
-{
-	strncpy(server_domain, domai, 100);
-}
-
-void ICACHE_FLASH_ATTR net_set_use_ip(bool use) 
-{
-	use_ip = use;
 }
 
 void ICACHE_FLASH_ATTR net_dns_found_cb(const char *name, ip_addr_t* ipaddr, void* arg)
@@ -178,7 +157,7 @@ void ICACHE_FLASH_ATTR server_connect(void)
 
 	server_conn.type = ESPCONN_TCP; 
 
-	if(use_ip) {
+	if(USE_IP) {
 		memcpy(server_conn.proto.tcp->remote_ip, server_ip, 4);
 	} else {
 		memcpy(server_conn.proto.tcp->remote_ip, dns_ip, 4);
@@ -201,7 +180,7 @@ void ICACHE_FLASH_ATTR server_connect_port(uint16_t port, espconn_connect_callba
 
 	server_conn.type = ESPCONN_TCP; 
 
-	if(use_ip) {
+	if(USE_IP) {
 		memcpy(server_conn.proto.tcp->remote_ip, server_ip, 4);
 	} else {
 		memcpy(server_conn.proto.tcp->remote_ip, dns_ip, 4);
@@ -233,7 +212,7 @@ void ICACHE_FLASH_ATTR net_update(void)
 	}
 
 	if(system_get_time() - dns_check_timer > (1*1000)) {
-		if(!use_ip) {
+		if(!USE_IP) {
 			if(is_wifi_connect && dns_state==DNS_STATE_NO_FOUND) {
 				ip_addr_t esp_server_ip;
 				struct espconn	conn;
@@ -249,7 +228,7 @@ void ICACHE_FLASH_ATTR net_update(void)
 		if((server_conn.state == ESPCONN_NONE || server_conn.state == ESPCONN_CLOSE) 
 		    && is_wifi_connect 
 			&& get_upgrade_state() == UPGRADE_STATE_IDLE
-			&& (use_ip || dns_state==DNS_STATE_FOUND)) 
+			&& (USE_IP || dns_state==DNS_STATE_FOUND)) 
 		{
 			server_connect();
 		}
@@ -257,34 +236,8 @@ void ICACHE_FLASH_ATTR net_update(void)
 	}
 }
 
-/*
-  0-3: len=4   magic:0xABABFFDC
-  4-7: len=4   ip
-  8-9: len=2   port
-   10: len=1   is_use_ip. =1 use ip; =0 use domain 
-11-99: len=89  domain(string)
-*/
 void ICACHE_FLASH_ATTR net_init(net_conn_cb* cb)
 {
-    uint8_t buf[100];
-    system_param_load(ADDR2SECTOR(NET_CONFIG_ADDR), 0, buf, 100); 	
-	if(((uint32_t*)buf)[0] == NET_CONFIG_MAGIC) {
-        memcpy(&server_ip, &buf[4], 4);
-		server_port = buf[8]<<8 | buf[9];
-		use_ip = buf[10];
-		memcpy(server_domain, &buf[11], 89);
-		server_domain[89] = 0;
-
-		if(use_ip) {
-			os_printf("net config ip:"IPSTR"\n", IP2STR(server_ip));
-		} else {
-			os_printf("net config domain:%s\n", server_domain);		
-		}
-		os_printf("net config port:%d\n", server_port);		
-	} else {
-		os_printf("net config corruption!\n");
-	}
-
 	server_conn.proto.tcp = NULL;
 	user_server_connect_cb = cb;
 	server_conn.proto.tcp = &tcp_buf;
