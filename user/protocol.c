@@ -47,6 +47,7 @@ bool ICACHE_FLASH_ATTR protocol_is_need_trans(uint8_t msg)
     || msg==CMD_MCU_UPGRADE_STATUS 
     || msg==CMD_MCU_UPGRADE_REQUEST
     || msg==CMD_GET_FIRMWARE_VER
+	|| msg==CMD_REQUEST_UPGRADE_STATUS
 	) {
 		return false;
 	} else {
@@ -126,6 +127,11 @@ int8_t ICACHE_FLASH_ATTR protocol_send(uint8_t ch, uint8_t cmd, bool need_ack, .
 		break;		
 	case CMD_GET_FIRMWARE_VER:	
 		break;		
+	case CMD_REQUEST_UPGRADE_STATUS:
+		send_buf[1] = va_arg(args, int);
+		send_buf[2] = va_arg(args, int);
+		datalen += 2;	
+		break;	
 	default:break;	
 	}
 	va_end(args);
@@ -288,6 +294,40 @@ uint8_t ICACHE_FLASH_ATTR protocol_msg_handle(void)
 		os_printf("latest version:%d.%d.%d\n", param[0], param[1], param[2]);
 		set_upgrade_get_version(param);
 		break;	
+	case CMD_REQUEST_UPGRADE_STATUS:
+	{
+		os_printf("recv cmd:CMD_REQUEST_UPGRADE_STATUS!\n");
+		uint8_t state = get_upgrade_state();
+		os_printf("state:%d!\n", state);
+		static uint8_t percent = 0;
+		if(state==UPGRADE_STATE_WAIT_PERCENT1) {
+			state = 0;
+			percent = 5;
+		}
+		else if(state==UPGRADE_STATE_CONNECTING || state==UPGRADE_STATE_DOWNLOAD) {
+			state = 0;
+			percent = 10;
+		}
+		else if(state==UPGRADE_STATE_WAIT_PERCENT2) {
+			state = 1;
+			percent = 30;
+		}
+		else if(state==UPGRADE_STATE_WAIT_PERCENT3) {
+			state = 1;
+			percent = 80;
+		} 
+		else if(state==UPGRADE_STATE_IDLE||state==UPGRADE_STATE_UPDATE_END||state==UPGRADE_STATE_WAIT_PERCENT4) {
+			state = 2;
+			percent = 100;
+		}
+		if(get_is_mcu_in_boot()) {
+			state = 1;
+			percent = 50;
+		}
+		protocol_send(PROTOCOL_CH_NET, cmd, false, 1, percent);
+		set_get_percent();
+		break;
+	}
 	default:break;					
 	}
 

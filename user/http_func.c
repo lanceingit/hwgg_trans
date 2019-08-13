@@ -132,7 +132,10 @@ void http_handle(uint8_t* data, uint16_t len)
                     int status = atoi(status_code);
                     os_printf("http response status:%d\n", status);
                     if(status != 200) {
+                        clear_is_need_upgrade();
                         return;
+                    } else {
+                        
                     }
                 }
                 else if(http_header_fields_get(line, "Content-Length: ", fields_data)) {
@@ -282,6 +285,7 @@ void http_handle(uint8_t* data, uint16_t len)
         os_printf("\n");        
 
         set_upgrade_download_done();
+        file_cnt = 0;
         //upgrade_handle();
     }
 }

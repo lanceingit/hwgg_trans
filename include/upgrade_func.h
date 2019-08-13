@@ -7,11 +7,17 @@
 
 typedef enum {
     UPGRADE_STATE_IDLE,
+    UPGRADE_STATE_WAIT_PERCENT1,
     UPGRADE_STATE_CONNECTING,
     UPGRADE_STATE_DOWNLOAD,
+    UPGRADE_STATE_WAIT_PERCENT2,
     UPGRADE_STATE_MCU_FILE_SAVE,
     UPGRADE_STATE_UPDATE_MCU,
+    UPGRADE_STATE_WAIT_PERCENT3,
+    UPGRADE_STATE_WAIT_PERCENT3_DONE,
     UPGRADE_STATE_UPDATE_WIFI,
+    UPGRADE_STATE_WAIT_PERCENT4,
+    UPGRADE_STATE_WAIT_PERCENT4_DONE,
     UPGRADE_STATE_UPDATE_END,
 } UpgradeState;
 
@@ -41,4 +47,8 @@ void set_upgrade_wifi(void);
 void set_upgrade_get_version(uint8_t* ver);
 void set_mcu_upgrade_result(UpgradeResult ret);
 bool get_is_mcu_in_upgrade(void);
+void clear_is_need_upgrade(void);
+bool get_is_upgrade_need_net(void);
+void set_get_percent(void);
+void set_send_done(void);
 

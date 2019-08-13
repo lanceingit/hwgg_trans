@@ -67,13 +67,16 @@ void ICACHE_FLASH_ATTR net_send(uint8_t* pdata, uint16_t len)
 
 void tcp_recv_cb(void *arg, char *pdata, unsigned short len) 
 {
-// 	os_printf("tcp recv:");
-// 	for(uint16_t i=0; i<len; i++) {
-// 		os_printf("%02x ", pdata[i]);
-// //		uart_trans_send(pdata[i]);
-// 	}
-// 	os_printf("\n");
-	http_handle(pdata, len);
+	if(get_is_upgrade_need_net()) {
+		http_handle(pdata, len);
+	} else {
+		os_printf("tcp recv:");
+		for(uint16_t i=0; i<len; i++) {
+			os_printf("%02x ", pdata[i]);
+	//		uart_trans_send(pdata[i]);
+		}
+		os_printf("\n");
+	}
 
 	//uart_trans_send(pdata, len);
 	protocol_set_recv(pdata, len);
@@ -82,6 +85,7 @@ void tcp_recv_cb(void *arg, char *pdata, unsigned short len)
 void ICACHE_FLASH_ATTR tcp_send_cb(void *arg)  
 {
 	os_printf("tcp send success!\n");
+	set_send_done();
 }
 
 void ICACHE_FLASH_ATTR tcp_disconnect_cb(void *arg)  
@@ -104,7 +108,7 @@ void ICACHE_FLASH_ATTR server_connect_cb(void *arg)
 	if(get_is_mcu_in_upgrade()) {
 		uint8_t mac[6];
 		wifi_get_macaddr(STATION_IF, mac);
-		os_printf("%d macaddr:%x %x %x %x %x %x\n"
+		os_printf("macaddr:%x %x %x %x %x %x\n"
 										,mac[0]
 										,mac[1]
 										,mac[2]
@@ -113,18 +117,18 @@ void ICACHE_FLASH_ATTR server_connect_cb(void *arg)
 										,mac[5]
 										);
 
-		uint8_t buf[]={0x46,0xB9,0x68,0x00,0x0C,0x00,0xF0,0x00,0x00,0x0E,0x01,0x84,0xf3,0xeb,0x74,0x02,0x79,0x04,0xc5,0x16};
+		uint8_t buf[]={0x46,0xB9,0x68,0x00,0x0D,0x00,0xF0,0x00,0x01,0xA4,0x01,0x84,0xf3,0xeb,0x74,0x02,0x79,0x00,0x04,0xc5,0x16};
 		for(uint8_t i=0; i<6; i++)
 		{
 			buf[11+i] = mac[i];
 		}
 		uint16_t sum=0;
-		for(uint8_t i=0; i<15; i++)
+		for(uint8_t i=0; i<16; i++)
 		{
 			sum += buf[2+i];
 		}
-		buf[17] = (uint8_t)(sum>>8);
-		buf[18] = (uint8_t)(sum&0xFF);
+		buf[18] = (uint8_t)(sum>>8);
+		buf[19] = (uint8_t)(sum&0xFF);
 		os_printf("send:");
 		for(uint8_t i=0; i<sizeof(buf); i++)
 		{
@@ -227,7 +231,7 @@ void ICACHE_FLASH_ATTR net_update(void)
 		os_printf("port:%d server_conn.state:%d\n",server_conn.proto.tcp->remote_port, server_conn.state);
 		if((server_conn.state == ESPCONN_NONE || server_conn.state == ESPCONN_CLOSE) 
 		    && is_wifi_connect 
-			&& get_upgrade_state() == UPGRADE_STATE_IDLE
+			&& !get_is_upgrade_need_net()
 			&& (USE_IP || dns_state==DNS_STATE_FOUND)) 
 		{
 			server_connect();

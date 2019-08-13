@@ -35,6 +35,34 @@ static uint8_t flash_buf[SPI_FLASH_SEC_SIZE] STORE_ATTR;
 static uint8_t lastest_ver[3];
 static char url[50];
 
+void ICACHE_FLASH_ATTR set_send_done(void)
+{
+    if(upgrade_state == UPGRADE_STATE_WAIT_PERCENT3_DONE) {
+        upgrade_state = UPGRADE_STATE_UPDATE_WIFI;
+    }
+    else if(upgrade_state == UPGRADE_STATE_WAIT_PERCENT4_DONE) {
+        system_upgrade_flag_set(UPGRADE_FLAG_FINISH);
+        system_upgrade_reboot();          
+        while(1);
+    }
+}
+
+void ICACHE_FLASH_ATTR set_get_percent(void)
+{
+    if(upgrade_state == UPGRADE_STATE_WAIT_PERCENT1) {
+        upgrade_state = UPGRADE_STATE_CONNECTING;
+        http_get(url, UPGRADE_SERVER_PORT);
+    }
+    else if(upgrade_state == UPGRADE_STATE_WAIT_PERCENT2) {
+        upgrade_state = UPGRADE_STATE_MCU_FILE_SAVE;
+    }
+    else if(upgrade_state == UPGRADE_STATE_WAIT_PERCENT3) {
+        upgrade_state = UPGRADE_STATE_WAIT_PERCENT3_DONE;
+    }
+    else if(upgrade_state == UPGRADE_STATE_WAIT_PERCENT4) {
+        upgrade_state = UPGRADE_STATE_WAIT_PERCENT4_DONE;
+    }
+}
 
 UpgradeInfo ICACHE_FLASH_ATTR get_upgrade_info(void)
 {
@@ -42,6 +70,7 @@ UpgradeInfo ICACHE_FLASH_ATTR get_upgrade_info(void)
     spi_flash_read(UPGRADE_INFO_ADDR, (uint32_t*)&self, sizeof(UpgradeInfo));  
     return self;
 }
+
 void ICACHE_FLASH_ATTR set_upgrade_info(UpgradeInfo* self)
 {
     self->magic = UPGRADE_INFO_MAGIC;
@@ -61,9 +90,26 @@ void ICACHE_FLASH_ATTR set_upgrade_type(uint8_t type)
     set_upgrade_info(&upgrade_info);    
 }
 
+void ICACHE_FLASH_ATTR clear_is_need_upgrade(void)
+{
+    upgrade_info.is_need_upgrade = false;
+    set_upgrade_info(&upgrade_info);       
+    upgrade_state = UPGRADE_STATE_IDLE;
+}
+
+
 bool ICACHE_FLASH_ATTR get_is_mcu_in_upgrade(void)
 {
-    return upgrade_type == UPGRADE_TYPE_MCU_FORCE;
+//    return upgrade_type == UPGRADE_TYPE_MCU_FORCE;
+    return (upgrade_type == UPGRADE_TYPE_MCU_FORCE
+         || get_is_mcu_in_boot() 
+         || upgrade_state == UPGRADE_STATE_WAIT_PERCENT2
+         );
+}
+
+bool ICACHE_FLASH_ATTR get_is_upgrade_need_net(void)
+{
+    return (upgrade_state==UPGRADE_STATE_CONNECTING || upgrade_state==UPGRADE_STATE_DOWNLOAD);
 }
 
 void ICACHE_FLASH_ATTR set_request_latest_version(void)
@@ -101,9 +147,8 @@ void ICACHE_FLASH_ATTR set_upgrade_get_version(uint8_t* ver)
         } 
     }
     memcpy(lastest_ver, ver, 3);
-    upgrade_state = UPGRADE_STATE_CONNECTING;    
+    upgrade_state = UPGRADE_STATE_WAIT_PERCENT1;    
     os_sprintf(url, "firmware/%d.%d.%d.fmw", lastest_ver[0], lastest_ver[1], lastest_ver[2]);
-    http_get(url, UPGRADE_SERVER_PORT);
 }
 
 UpgradeState ICACHE_FLASH_ATTR get_upgrade_state(void)
@@ -121,7 +166,8 @@ void ICACHE_FLASH_ATTR set_upgrade_download_done(void)
     if(wifi_upgrade_ret == UPGRADE_RET_CRC_ERR) {
         upgrade_state = UPGRADE_STATE_UPDATE_WIFI;
     } else {
-        upgrade_state = UPGRADE_STATE_MCU_FILE_SAVE;
+        server_abort();
+        upgrade_state = UPGRADE_STATE_WAIT_PERCENT2;
     }
 }
 
@@ -283,9 +329,10 @@ void upgrade_wifi(void)
     if(wifi_checksum_ret == true) {
         upgrade_info.is_need_upgrade = false;
         set_upgrade_info(&upgrade_info);              
-        system_upgrade_flag_set(UPGRADE_FLAG_FINISH);
-        system_upgrade_reboot();      
-        upgrade_state = UPGRADE_STATE_IDLE;  
+        // system_upgrade_flag_set(UPGRADE_FLAG_FINISH);
+        // system_upgrade_reboot();      
+        upgrade_state = UPGRADE_STATE_WAIT_PERCENT4;  
+        //while(1); 
     } else {
         os_printf("wifi firmware crc err!\n");
         goto upgrade_err;
@@ -295,52 +342,52 @@ upgrade_err:
     os_printf("upgrade err!\n");    
 }
 
-void upgrade_handle(void)
-{
-    os_printf("upgrade handle!\n");
-    spi_flash_read(DOWNLOAD_FILE_ADDR, (uint32_t*)read_buf, 8);
-    uint8_t device_type = read_buf[0];
-    uint8_t wifi_ver = read_buf[2];
-    uint8_t mcu_ver = read_buf[3];
-    os_printf("version:%d.%d.%d\n", read_buf[1], wifi_ver, mcu_ver);
-    uint32_t mcu_firmware_size = BIG32(&read_buf[4]);
+// void upgrade_handle(void)
+// {
+//     os_printf("upgrade handle!\n");
+//     spi_flash_read(DOWNLOAD_FILE_ADDR, (uint32_t*)read_buf, 8);
+//     uint8_t device_type = read_buf[0];
+//     uint8_t wifi_ver = read_buf[2];
+//     uint8_t mcu_ver = read_buf[3];
+//     os_printf("version:%d.%d.%d\n", read_buf[1], wifi_ver, mcu_ver);
+//     uint32_t mcu_firmware_size = BIG32(&read_buf[4]);
 
-    os_printf("\nmcu firmware phase! start_addr:%x write_addr:%x\n", DOWNLOAD_FILE_ADDR+8, MCU_FIRMWARE_ADDR);
-    bool mcu_checksum_ret = upgrade_firmware_phase(DOWNLOAD_FILE_ADDR+8, MCU_FIRMWARE_ADDR, false);
+//     os_printf("\nmcu firmware phase! start_addr:%x write_addr:%x\n", DOWNLOAD_FILE_ADDR+8, MCU_FIRMWARE_ADDR);
+//     bool mcu_checksum_ret = upgrade_firmware_phase(DOWNLOAD_FILE_ADDR+8, MCU_FIRMWARE_ADDR, false);
      
-    spi_flash_read(DOWNLOAD_FILE_ADDR+8+mcu_firmware_size+2, (uint32_t*)read_buf, 4);
-    uint32_t wifi1_firmware_size = BIG32(read_buf); 
-    uint8_t curr_userbin = system_upgrade_userbin_check();
-    os_printf("wifi user bin:%d\n", curr_userbin+1);
-    uint32_t start_addr;
-    uint32_t write_addr;
-    if(curr_userbin==0) {
-        start_addr = DOWNLOAD_FILE_ADDR+8+mcu_firmware_size+6+wifi1_firmware_size+2;
-        write_addr = WIFI2_FIRMWARE_ADDR;
-    }
-    else if(curr_userbin==1) {
-        start_addr = DOWNLOAD_FILE_ADDR+8+mcu_firmware_size+2;
-        write_addr = WIFI1_FIRMWARE_ADDR;
-    } 
-    else {
-        os_printf("user bin err!\n");      
-        goto upgrade_err;  
-    }
-    os_printf("\nwifi firmware phase! start_addr:%x write_addr:%x\n", DOWNLOAD_FILE_ADDR+8, MCU_FIRMWARE_ADDR);
-    bool wifi_checksum_ret = upgrade_firmware_phase(start_addr, write_addr, true);
-    if(wifi_checksum_ret == true) {
-        system_upgrade_flag_set(UPGRADE_FLAG_FINISH);
-        system_upgrade_reboot();   
-        while(1);     
-    } else {
-        os_printf("wifi firmware crc err!\n");
-        goto upgrade_err;
-    }   
+//     spi_flash_read(DOWNLOAD_FILE_ADDR+8+mcu_firmware_size+2, (uint32_t*)read_buf, 4);
+//     uint32_t wifi1_firmware_size = BIG32(read_buf); 
+//     uint8_t curr_userbin = system_upgrade_userbin_check();
+//     os_printf("wifi user bin:%d\n", curr_userbin+1);
+//     uint32_t start_addr;
+//     uint32_t write_addr;
+//     if(curr_userbin==0) {
+//         start_addr = DOWNLOAD_FILE_ADDR+8+mcu_firmware_size+6+wifi1_firmware_size+2;
+//         write_addr = WIFI2_FIRMWARE_ADDR;
+//     }
+//     else if(curr_userbin==1) {
+//         start_addr = DOWNLOAD_FILE_ADDR+8+mcu_firmware_size+2;
+//         write_addr = WIFI1_FIRMWARE_ADDR;
+//     } 
+//     else {
+//         os_printf("user bin err!\n");      
+//         goto upgrade_err;  
+//     }
+//     os_printf("\nwifi firmware phase! start_addr:%x write_addr:%x\n", DOWNLOAD_FILE_ADDR+8, MCU_FIRMWARE_ADDR);
+//     bool wifi_checksum_ret = upgrade_firmware_phase(start_addr, write_addr, true);
+//     if(wifi_checksum_ret == true) {
+//         // system_upgrade_flag_set(UPGRADE_FLAG_FINISH);
+//         // system_upgrade_reboot();   
+//         while(1);     
+//     } else {
+//         os_printf("wifi firmware crc err!\n");
+//         goto upgrade_err;
+//     }   
 
-    return;
-upgrade_err:
-    os_printf("upgrade err!\n");
-}
+//     return;
+// upgrade_err:
+//     os_printf("upgrade err!\n");
+// }
 
 // void upgrade_handle(void)
 // {
@@ -556,7 +603,7 @@ void upgrade_init(void)
             if(upgrade_info.upgrade_type != UPGRADE_TYPE_MCU_FORCE) {
                 if(upgrade_info.is_need_upgrade) {
                     if(!get_is_mcu_need_upgrade_first()) {
-                        upgrade_state = UPGRADE_STATE_UPDATE_WIFI;
+                        upgrade_state = UPGRADE_STATE_WAIT_PERCENT3;
                     }
                 }
             }
