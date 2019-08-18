@@ -300,13 +300,13 @@ uint8_t ICACHE_FLASH_ATTR protocol_msg_handle(void)
 		uint8_t state = get_upgrade_state();
 		os_printf("state:%d!\n", state);
 		static uint8_t percent = 0;
-		if(state==UPGRADE_STATE_WAIT_PERCENT1) {
+		// if(state==UPGRADE_STATE_WAIT_PERCENT1) {
+		// 	state = 0;
+		// 	percent = 5;
+		// }
+		if(state==UPGRADE_STATE_CONNECTING || state==UPGRADE_STATE_DOWNLOAD) {
 			state = 0;
-			percent = 5;
-		}
-		else if(state==UPGRADE_STATE_CONNECTING || state==UPGRADE_STATE_DOWNLOAD) {
-			state = 0;
-			percent = 10;
+			percent = 0;
 		}
 		else if(state==UPGRADE_STATE_WAIT_PERCENT2) {
 			state = 1;
@@ -314,7 +314,7 @@ uint8_t ICACHE_FLASH_ATTR protocol_msg_handle(void)
 		}
 		else if(state==UPGRADE_STATE_WAIT_PERCENT3) {
 			state = 1;
-			percent = 80;
+			percent = 70;
 		} 
 		else if(state==UPGRADE_STATE_IDLE||state==UPGRADE_STATE_UPDATE_END||state==UPGRADE_STATE_WAIT_PERCENT4) {
 			state = 2;
@@ -322,7 +322,7 @@ uint8_t ICACHE_FLASH_ATTR protocol_msg_handle(void)
 		}
 		if(get_is_mcu_in_boot()) {
 			state = 1;
-			percent = 50;
+			percent = 30;
 		}
 		protocol_send(PROTOCOL_CH_NET, cmd, false, 1, percent);
 		set_get_percent();

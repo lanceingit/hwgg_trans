@@ -49,11 +49,11 @@ void ICACHE_FLASH_ATTR set_send_done(void)
 
 void ICACHE_FLASH_ATTR set_get_percent(void)
 {
-    if(upgrade_state == UPGRADE_STATE_WAIT_PERCENT1) {
-        upgrade_state = UPGRADE_STATE_CONNECTING;
-        http_get(url, UPGRADE_SERVER_PORT);
-    }
-    else if(upgrade_state == UPGRADE_STATE_WAIT_PERCENT2) {
+    // if(upgrade_state == UPGRADE_STATE_WAIT_PERCENT1) {
+    //     upgrade_state = UPGRADE_STATE_CONNECTING;
+    //     http_get(url, UPGRADE_SERVER_PORT);
+    // }
+    if(upgrade_state == UPGRADE_STATE_WAIT_PERCENT2) {
         upgrade_state = UPGRADE_STATE_MCU_FILE_SAVE;
     }
     else if(upgrade_state == UPGRADE_STATE_WAIT_PERCENT3) {
@@ -147,8 +147,10 @@ void ICACHE_FLASH_ATTR set_upgrade_get_version(uint8_t* ver)
         } 
     }
     memcpy(lastest_ver, ver, 3);
-    upgrade_state = UPGRADE_STATE_WAIT_PERCENT1;    
+//    upgrade_state = UPGRADE_STATE_WAIT_PERCENT1;    
     os_sprintf(url, "firmware/%d.%d.%d.fmw", lastest_ver[0], lastest_ver[1], lastest_ver[2]);
+    upgrade_state = UPGRADE_STATE_CONNECTING;
+    http_get(url, UPGRADE_SERVER_PORT);    
 }
 
 UpgradeState ICACHE_FLASH_ATTR get_upgrade_state(void)
@@ -166,8 +168,12 @@ void ICACHE_FLASH_ATTR set_upgrade_download_done(void)
     if(wifi_upgrade_ret == UPGRADE_RET_CRC_ERR) {
         upgrade_state = UPGRADE_STATE_UPDATE_WIFI;
     } else {
-        server_abort();
-        upgrade_state = UPGRADE_STATE_WAIT_PERCENT2;
+        if(upgrade_type != UPGRADE_TYPE_MCU_FORCE) {
+            server_abort();
+            upgrade_state = UPGRADE_STATE_WAIT_PERCENT2;
+        } else {
+            upgrade_state = UPGRADE_STATE_MCU_FILE_SAVE;
+        }
     }
 }
 
